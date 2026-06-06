@@ -5,9 +5,11 @@ import { isMatchToday } from '~/utils/footballUi'
 import { filledBonusCount, isBonusAnswerFilled, isBonusLocked, resolveBonusGlobalLockAt, resolveBonusQuestion } from '~/utils/bonus'
 import { defaultScoringRules, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen } from '~/utils/scoring'
 
-const { bonusPredictions, bonusQuestions, currentUserId, errorMessage, hasLeague, hasLoaded, isLoading, league, matchEvents, matches, members, players, predictions, ranking, stages, teams, tournament } =
+const { bonusPredictions, bonusQuestions, currentUserId, errorMessage, hasLeague, hasLoaded, isLoading, league, matchEvents, matches, members, players, predictionPresence, predictions, ranking, stages, teams, tournament } =
   useTyperekData()
 const { getMatchTeams, getPlayer } = useTeamLookup(teams, players)
+const { predictionMembersFor } = usePredictionParticipants(members, predictionPresence, predictions)
+const currentMember = computed(() => members.find((member) => member.userId === currentUserId.value))
 const { currentStagePendingCount } = usePendingPredictions()
 const now = shallowRef(new Date())
 
@@ -223,7 +225,7 @@ function bonusCardMessage() {
 
         <div v-if="hasLeague" class="hero-copy-stack">
           <p class="subheading">
-            Prywatna liga MŚ 2026. Typy są ukryte przed innymi graczami do startu konkretnego meczu.
+            Prywatna liga MŚ 2026.
           </p>
 
           <div class="hero-rules">
@@ -363,10 +365,12 @@ function bonusCardMessage() {
           :stage="stageFor(match.stageId)!"
           :to="`/matches/${match.id}`"
           :prediction="ownPredictionFor(match.id)"
+          :current-member="currentMember"
           :first-scorer="getPlayer(ownPredictionFor(match.id)?.firstScorerPlayerId ?? null)"
           :attention="needsAttention(match)"
           :pending="needsPrediction(match)"
           :locked-label="lockedLabel(match)"
+          :predicted-members="predictionMembersFor(match.id)"
         />
       </div>
     </section>

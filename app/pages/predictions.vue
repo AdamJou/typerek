@@ -1,6 +1,8 @@
 <script setup lang="ts">
-const { currentUserId, hasLoaded, matchEvents, matches, players, predictions, stages, teams } = useTyperekData()
+const { currentUserId, hasLoaded, matchEvents, matches, members, players, predictionPresence, predictions, stages, teams } = useTyperekData()
 const { getMatchTeams, getPlayer } = useTeamLookup(teams, players)
+const { predictionMembersFor } = usePredictionParticipants(members, predictionPresence, predictions)
+const currentMember = computed(() => members.find((member) => member.userId === currentUserId.value))
 const ownPredictions = computed(() =>
   predictions.value.filter((prediction) => prediction.userId === currentUserId.value),
 )
@@ -40,7 +42,9 @@ function stageFor(stageId: string) {
             :stage="stageFor(matchFor(prediction.matchId)!.stageId)!"
             :to="`/matches/${prediction.matchId}`"
             :prediction="prediction"
+            :current-member="currentMember"
             :first-scorer="getPlayer(prediction.firstScorerPlayerId)"
+            :predicted-members="predictionMembersFor(prediction.matchId)"
           />
         </template>
       </article>

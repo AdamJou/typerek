@@ -12,13 +12,17 @@ const {
   league,
   matchEvents,
   matches,
+  members,
   players,
+  predictionPresence,
   predictions,
   stages,
   teams,
   upsertLocalPrediction,
 } = useTyperekData()
 const { getMatchTeams, getPlayer, getPlayersForMatch } = useTeamLookup(teams, players)
+const { predictionMembersFor } = usePredictionParticipants(members, predictionPresence, predictions)
+const currentMember = computed(() => members.find((member) => member.userId === currentUserId.value))
 const match = computed(() => matches.find((candidate) => candidate.id === route.params.id))
 const currentMatchEvents = computed(() => (match.value ? matchEvents.filter((event) => event.matchId === match.value?.id) : []))
 const matchTeams = computed(() => (match.value ? getMatchTeams(match.value) : null))
@@ -118,9 +122,11 @@ async function savePrediction(prediction: Parameters<typeof upsertLocalPredictio
       :away-team="matchTeams?.awayTeam"
       :stage="stage"
       :prediction="existingPrediction"
+      :current-member="currentMember"
       :first-scorer="getPlayer(existingPrediction?.firstScorerPlayerId ?? null)"
       :pending="canShowPending"
       :locked-label="lockedLabel"
+      :predicted-members="predictionMembersFor(match.id)"
     />
 
     <p v-if="savedMessage" class="save-toast" role="status">{{ savedMessage }}</p>

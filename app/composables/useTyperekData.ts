@@ -10,6 +10,7 @@ import type {
   Match,
   MatchEvent,
   MatchPrediction,
+  MatchPredictionPresence,
   Player,
   ScoreBreakdown,
   SynchronizationLog,
@@ -37,6 +38,7 @@ const bonusOptions = reactive<BonusQuestionOption[]>([])
 const bonusResolutions = reactive<BonusQuestionResolution[]>([])
 const synchronizationLogs = reactive<SynchronizationLog[]>([])
 const predictions = shallowRef<MatchPrediction[]>([])
+const predictionPresence = shallowRef<MatchPredictionPresence[]>([])
 const bonusPredictions = shallowRef<BonusPrediction[]>([])
 const scoreBreakdowns = shallowRef<ScoreBreakdown[]>([])
 const currentUserId = shallowRef<string | null>(null)
@@ -99,6 +101,9 @@ export function useTyperekData() {
     const repository = getRepository()
     await repository.deleteMatchPrediction(matchId)
     predictions.value = predictions.value.filter((prediction) => prediction.matchId !== matchId)
+    predictionPresence.value = predictionPresence.value.filter(
+      (presence) => presence.matchId !== matchId || presence.userId !== currentUserId.value,
+    )
   }
 
   async function setMatchResult(payload: SetMatchResultPayload) {
@@ -127,6 +132,7 @@ export function useTyperekData() {
     matchEvents: readonly(matchEvents),
     members: readonly(members),
     predictions: readonly(predictions),
+    predictionPresence: readonly(predictionPresence),
     bonusQuestions: readonly(bonusQuestions),
     bonusOptions: readonly(bonusOptions),
     bonusPredictions: readonly(bonusPredictions),
@@ -165,6 +171,7 @@ export function clearTyperekData() {
   replaceArray(bonusResolutions, [])
   replaceArray(synchronizationLogs, [])
   predictions.value = []
+  predictionPresence.value = []
   bonusPredictions.value = []
   scoreBreakdowns.value = []
   currentUserId.value = null
@@ -238,6 +245,7 @@ function applySnapshot(snapshot: Awaited<ReturnType<TyperekRepository['getWorldC
   replaceArray(bonusResolutions, snapshot.bonusResolutions)
   replaceArray(synchronizationLogs, snapshot.synchronizationLogs)
   predictions.value = snapshot.predictions
+  predictionPresence.value = mergePredictionPresence(snapshot.predictionPresence, snapshot.predictions)
   bonusPredictions.value = snapshot.bonusPredictions
   scoreBreakdowns.value = snapshot.scoreBreakdowns
 }
@@ -258,6 +266,28 @@ function upsertPredictionInState(prediction: MatchPrediction) {
   }
 
   predictions.value = nextPredictions
+
+  if (!predictionPresence.value.some((item) => item.matchId === prediction.matchId && item.userId === prediction.userId)) {
+    predictionPresence.value = [
+      ...predictionPresence.value,
+      { matchId: prediction.matchId, userId: prediction.userId },
+    ]
+  }
+}
+
+function mergePredictionPresence(
+  presence: readonly MatchPredictionPresence[],
+  visiblePredictions: readonly MatchPrediction[],
+) {
+  const result = new Map<string, MatchPredictionPresence>()
+
+  for (const item of [...presence, ...visiblePredictions]) {
+    const entry = { matchId: item.matchId, userId: item.userId }
+
+    result.set(`${entry.matchId}:${entry.userId}`, entry)
+  }
+
+  return [...result.values()]
 }
 
 function upsertBonusPredictionInState(prediction: BonusPrediction) {

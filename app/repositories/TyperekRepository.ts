@@ -9,6 +9,7 @@ import type {
   Match,
   MatchEvent,
   MatchPrediction,
+  MatchPredictionPresence,
   MatchScorerInput,
   Player,
   ScoreBreakdown,
@@ -51,6 +52,7 @@ export interface TyperekDataSnapshot {
   matchEvents: MatchEvent[]
   members: LeagueMember[]
   predictions: MatchPrediction[]
+  predictionPresence: MatchPredictionPresence[]
   bonusQuestions: BonusQuestion[]
   bonusOptions: BonusQuestionOption[]
   bonusPredictions: BonusPrediction[]
@@ -164,6 +166,11 @@ interface MatchPredictionRow {
   updated_at: string
 }
 
+interface MatchPredictionPresenceRow {
+  match_id: string
+  user_id: string
+}
+
 interface BonusQuestionRow {
   id: string
   league_id: string
@@ -261,6 +268,7 @@ export class TyperekRepository {
         matchEvents,
         members: [],
         predictions: [],
+        predictionPresence: [],
         bonusQuestions: [],
         bonusOptions: [],
         bonusPredictions: [],
@@ -270,9 +278,10 @@ export class TyperekRepository {
       }
     }
 
-    const [members, predictions, bonusQuestions, scoreBreakdowns] = await Promise.all([
+    const [members, predictions, predictionPresence, bonusQuestions, scoreBreakdowns] = await Promise.all([
       this.listLeagueMembers(league.id),
       this.listMatchPredictions(league.id),
+      this.listMatchPredictionPresence(league.id),
       this.listBonusQuestions(league.id),
       this.listScoreBreakdowns(league.id),
     ])
@@ -293,6 +302,7 @@ export class TyperekRepository {
       matchEvents,
       members,
       predictions,
+      predictionPresence,
       bonusQuestions,
       bonusOptions,
       bonusPredictions,
@@ -471,6 +481,25 @@ export class TyperekRepository {
     )
 
     return rows.map(mapMatchPrediction)
+  }
+
+  private async listMatchPredictionPresence(leagueId: string) {
+    const { data, error } = await this.supabase.rpc('list_match_prediction_presence', {
+      p_league_id: leagueId,
+    })
+
+    if (error) {
+      if (error.code === 'PGRST202' || error.code === '42883') {
+        return []
+      }
+
+      throw error
+    }
+
+    return (data as MatchPredictionPresenceRow[]).map((row) => ({
+      matchId: row.match_id,
+      userId: row.user_id,
+    }))
   }
 
   private async listBonusQuestions(leagueId: string) {

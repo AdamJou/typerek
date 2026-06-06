@@ -7,9 +7,11 @@ import { currentPredictionStageId, isMatchPredictionOpen, isPredictionLocked, is
 
 type MatchViewMode = 'pending' | 'all' | 'bulk'
 
-const { currentUserId, errorMessage, hasLeague, hasLoaded, isLoading, league, matchEvents, matches, players, predictions, stages, teams, upsertPrediction } =
+const { currentUserId, errorMessage, hasLeague, hasLoaded, isLoading, league, matchEvents, matches, members, players, predictionPresence, predictions, stages, teams, upsertPrediction } =
   useTyperekData()
 const { getMatchTeams, getPlayer, getPlayersForMatch } = useTeamLookup(teams, players)
+const { predictionMembersFor } = usePredictionParticipants(members, predictionPresence, predictions)
+const currentMember = computed(() => members.find((member) => member.userId === currentUserId.value))
 
 const activeMode = shallowRef<MatchViewMode>('pending')
 const activeStageId = shallowRef('')
@@ -293,8 +295,10 @@ watch(
             :home-team="getMatchTeams(match).homeTeam"
             :away-team="getMatchTeams(match).awayTeam"
             :stage="stageFor(match.stageId)!"
+            :current-member="currentMember"
             :pending="true"
             :locked-label="lockedLabel(match)"
+            :predicted-members="predictionMembersFor(match.id)"
           />
 
           <BulkPredictionEditor
@@ -352,10 +356,12 @@ watch(
             :stage="stageFor(match.stageId)!"
             :to="`/matches/${match.id}`"
             :prediction="ownPredictionFor(match.id)"
+            :current-member="currentMember"
             :first-scorer="getPlayer(ownPredictionFor(match.id)?.firstScorerPlayerId ?? null)"
             :attention="needsAttention(match)"
             :pending="needsPrediction(match)"
             :locked-label="lockedLabel(match)"
+            :predicted-members="predictionMembersFor(match.id)"
           />
         </div>
       </section>

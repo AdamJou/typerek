@@ -119,6 +119,11 @@ export interface MatchPrediction {
   updatedAt: string
 }
 
+export interface MatchPredictionPresence {
+  matchId: string
+  userId: string
+}
+
 export interface ScoringRules {
   resultPoints: number
   exactScoreBonus: number

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Check, ChevronRight, MapPin, X } from 'lucide-vue-next'
-import type { Match, MatchEvent, MatchPrediction, Player, Team, TournamentStage } from '~/types/domain'
+import type { LeagueMember, Match, MatchEvent, MatchPrediction, Player, Team, TournamentStage } from '~/types/domain'
 import { displayTeamName, formatPlayerNameParts, getTeamFlag, predictionScoreLabel } from '~/utils/footballUi'
 
 const props = defineProps<{
@@ -11,13 +11,28 @@ const props = defineProps<{
   stage: TournamentStage
   to?: string
   prediction?: MatchPrediction
+  currentMember?: LeagueMember
   firstScorer?: Player | null
   attention?: boolean
   pending?: boolean
   lockedLabel?: string | null
+  predictedMembers?: readonly LeagueMember[]
 }>()
 
 const cardComponent = computed(() => (props.to ? resolveComponent('NuxtLink') : 'article'))
+const participantMembers = computed(() => {
+  const members = [...(props.predictedMembers ?? [])]
+
+  if (
+    props.prediction &&
+    props.currentMember &&
+    !members.some((member) => member.userId === props.prediction?.userId)
+  ) {
+    members.push(props.currentMember)
+  }
+
+  return members
+})
 const hasActualScore = computed(
   () =>
     props.match.homeScore90 !== null &&
@@ -240,6 +255,11 @@ function isOwnGoal(event: MatchEvent) {
         <p v-else><strong>-</strong></p>
       </div>
     </div>
+
+    <PredictionParticipants
+      v-if="participantMembers.length"
+      :members="participantMembers"
+    />
 
     <div
       v-if="props.prediction"
