@@ -166,6 +166,7 @@ export const useAuthStore = defineStore('auth', () => {
           data: {
             display_name: payload.displayName.trim(),
           },
+          emailRedirectTo: import.meta.client ? `${window.location.origin}/auth/login` : undefined,
         },
       })
 

@@ -9,6 +9,7 @@ definePageMeta({
 const email = shallowRef('')
 const displayName = shallowRef('')
 const password = shallowRef('')
+const passwordRepeat = shallowRef('')
 const errorMessage = shallowRef('')
 const loading = shallowRef(false)
 const confirmationEmail = shallowRef('')
@@ -21,8 +22,14 @@ if (isAuthenticated.value) {
 }
 
 async function submit() {
-  loading.value = true
   errorMessage.value = ''
+
+  if (password.value !== passwordRepeat.value) {
+    errorMessage.value = 'Hasła nie są takie same.'
+    return
+  }
+
+  loading.value = true
 
   try {
     const result = await register({ email: email.value, password: password.value, displayName: displayName.value })
@@ -30,6 +37,7 @@ async function submit() {
     if (result.requiresEmailConfirmation) {
       confirmationEmail.value = email.value.trim()
       password.value = ''
+      passwordRepeat.value = ''
       return
     }
 
@@ -83,10 +91,19 @@ async function submit() {
       <input v-model="displayName" class="input" autocomplete="nickname" minlength="2" maxlength="32" required />
     </label>
 
-    <label>
-      <span class="eyeless-label">Hasło</span>
-      <input v-model="password" class="input" type="password" autocomplete="new-password" minlength="8" required />
-    </label>
+    <PasswordInput
+      v-model="password"
+      label="Hasło"
+      autocomplete="new-password"
+      :minlength="8"
+    />
+
+    <PasswordInput
+      v-model="passwordRepeat"
+      label="Powtórz hasło"
+      autocomplete="new-password"
+      :minlength="8"
+    />
 
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 

@@ -49,10 +49,11 @@ async function submit() {
       <input v-model="email" class="input" type="email" autocomplete="email" required />
     </label>
 
-    <label>
-      <span class="eyeless-label">Hasło</span>
-      <input v-model="password" class="input" type="password" autocomplete="current-password" required />
-    </label>
+    <PasswordInput
+      v-model="password"
+      label="Hasło"
+      autocomplete="current-password"
+    />
 
     <p v-if="errorMessage" class="error-message">{{ errorMessage }}</p>
 
