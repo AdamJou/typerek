@@ -476,7 +476,7 @@ watch(
 
 .bulk-submit-bar {
   position: sticky;
-  bottom: 10px;
+  bottom: 57px;
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 18px 40px rgba(18, 35, 27, 0.12);
   backdrop-filter: blur(10px);
