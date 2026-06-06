@@ -668,6 +668,19 @@ export class TyperekRepository {
     }
   }
 
+  async getRevealedMatchPrediction(matchId: string, userId: string) {
+    const { data, error } = await this.supabase.rpc('get_revealed_match_prediction', {
+      p_match_id: matchId,
+      p_user_id: userId,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    return data ? mapMatchPrediction(data as MatchPredictionRow) : null
+  }
+
   async upsertBonusPrediction(payload: UpsertBonusPredictionPayload) {
     const { data, error } = await this.supabase.rpc('upsert_bonus_prediction', {
       p_question_id: payload.questionId,

@@ -2,6 +2,7 @@
 import { Check, ChevronRight, MapPin, X } from 'lucide-vue-next'
 import type { LeagueMember, Match, MatchEvent, MatchPrediction, Player, Team, TournamentStage } from '~/types/domain'
 import { displayTeamName, formatPlayerNameParts, getTeamFlag, predictionScoreLabel } from '~/utils/footballUi'
+import { canRevealMatchPredictions } from '~/utils/scoring'
 
 const props = defineProps<{
   match: Match
@@ -11,7 +12,9 @@ const props = defineProps<{
   stage: TournamentStage
   to?: string
   prediction?: MatchPrediction
+  matchPredictions?: readonly MatchPrediction[]
   currentMember?: LeagueMember
+  players?: readonly Player[]
   firstScorer?: Player | null
   attention?: boolean
   pending?: boolean
@@ -20,6 +23,14 @@ const props = defineProps<{
 }>()
 
 const cardComponent = computed(() => (props.to ? resolveComponent('NuxtLink') : 'article'))
+const now = shallowRef(Date.now())
+const selectedMember = shallowRef<LeagueMember | null>(null)
+const selectedPrediction = shallowRef<MatchPrediction | null>(null)
+const selectedPredictionLoading = shallowRef(false)
+const selectedPredictionError = shallowRef('')
+let selectedPredictionRequestId = 0
+let unlockTimer: ReturnType<typeof setTimeout> | null = null
+
 const participantMembers = computed(() => {
   const members = [...(props.predictedMembers ?? [])]
 
@@ -32,6 +43,31 @@ const participantMembers = computed(() => {
   }
 
   return members
+})
+const canRevealPredictions = computed(
+  () => canRevealMatchPredictions(props.match, new Date(now.value)),
+)
+const selectedMemberIndex = computed(() => {
+  if (!selectedMember.value) {
+    return -1
+  }
+
+  return participantMembers.value.findIndex((member) => member.userId === selectedMember.value?.userId)
+})
+const canShowPreviousPrediction = computed(() => selectedMemberIndex.value > 0)
+const canShowNextPrediction = computed(() => {
+  return selectedMemberIndex.value >= 0 && selectedMemberIndex.value < participantMembers.value.length - 1
+})
+const selectedScorerName = computed(() => {
+  if (!selectedPrediction.value) {
+    return ''
+  }
+
+  if (selectedPrediction.value.noScorer) {
+    return 'Brak strzelca'
+  }
+
+  return props.players?.find((player) => player.id === selectedPrediction.value?.firstScorerPlayerId)?.name ?? 'Strzelec wybrany'
 })
 const hasActualScore = computed(
   () =>
@@ -173,6 +209,94 @@ function goalScorerNameParts(event: MatchEvent) {
 function isOwnGoal(event: MatchEvent) {
   return event.detail === 'manual_own_goal' || event.detail === 'own_goal'
 }
+
+function schedulePredictionUnlock() {
+  const delay = new Date(props.match.startsAtUtc).getTime() - Date.now()
+
+  if (delay <= 0) {
+    now.value = Date.now()
+    return
+  }
+
+  unlockTimer = setTimeout(() => {
+    now.value = Date.now()
+    schedulePredictionUnlock()
+  }, Math.min(delay + 100, 2_147_483_647))
+}
+
+async function openPrediction(member: LeagueMember) {
+  if (!canRevealPredictions.value) {
+    return
+  }
+
+  const requestId = ++selectedPredictionRequestId
+
+  selectedMember.value = member
+  selectedPredictionLoading.value = false
+  selectedPrediction.value =
+    props.matchPredictions?.find((prediction) => prediction.userId === member.userId) ??
+    (props.prediction?.userId === member.userId ? props.prediction : null)
+  selectedPredictionError.value = ''
+
+  if (selectedPrediction.value) {
+    return
+  }
+
+  selectedPredictionLoading.value = true
+
+  try {
+    const repository = useTyperekRepository()
+
+    if (!repository) {
+      throw new Error('Brak połączenia z bazą danych.')
+    }
+
+    const prediction = await repository.getRevealedMatchPrediction(props.match.id, member.userId)
+
+    if (requestId !== selectedPredictionRequestId) {
+      return
+    }
+
+    selectedPrediction.value = prediction
+  } catch {
+    if (requestId !== selectedPredictionRequestId) {
+      return
+    }
+
+    selectedPredictionError.value = 'Nie udało się pobrać typu tego gracza.'
+  } finally {
+    if (requestId === selectedPredictionRequestId) {
+      selectedPredictionLoading.value = false
+    }
+  }
+}
+
+function openAdjacentPrediction(direction: -1 | 1) {
+  const nextIndex = selectedMemberIndex.value + direction
+  const nextMember = participantMembers.value.at(nextIndex)
+
+  if (!nextMember) {
+    return
+  }
+
+  void openPrediction(nextMember)
+}
+
+function closePredictionModal() {
+  selectedPredictionRequestId += 1
+  selectedMember.value = null
+  selectedPrediction.value = null
+  selectedPredictionError.value = ''
+  selectedPredictionLoading.value = false
+}
+
+onMounted(schedulePredictionUnlock)
+
+onBeforeUnmount(() => {
+  if (unlockTimer) {
+    clearTimeout(unlockTimer)
+  }
+})
 </script>
 
 <template>
@@ -259,6 +383,8 @@ function isOwnGoal(event: MatchEvent) {
     <PredictionParticipants
       v-if="participantMembers.length"
       :members="participantMembers"
+      :interactive="canRevealPredictions"
+      @select="openPrediction"
     />
 
     <div
@@ -292,6 +418,20 @@ function isOwnGoal(event: MatchEvent) {
       <span>{{ actionLabel }}</span>
       <ChevronRight :size="18" aria-hidden="true" />
     </div>
+
+    <PredictionDetailsModal
+      v-if="selectedMember"
+      :member="selectedMember"
+      :prediction="selectedPrediction"
+      :scorer-name="selectedScorerName"
+      :loading="selectedPredictionLoading"
+      :error-message="selectedPredictionError"
+      :can-go-previous="canShowPreviousPrediction"
+      :can-go-next="canShowNextPrediction"
+      @close="closePredictionModal"
+      @previous="openAdjacentPrediction(-1)"
+      @next="openAdjacentPrediction(1)"
+    />
   </component>
 </template>
 

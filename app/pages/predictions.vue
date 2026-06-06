@@ -15,6 +15,10 @@ function matchEventsFor(matchId: string) {
   return matchEvents.filter((event) => event.matchId === matchId)
 }
 
+function predictionsFor(matchId: string) {
+  return predictions.value.filter((prediction) => prediction.matchId === matchId)
+}
+
 function stageFor(stageId: string) {
   return stages.find((stage) => stage.id === stageId)
 }
@@ -42,7 +46,9 @@ function stageFor(stageId: string) {
             :stage="stageFor(matchFor(prediction.matchId)!.stageId)!"
             :to="`/matches/${prediction.matchId}`"
             :prediction="prediction"
+            :match-predictions="predictionsFor(prediction.matchId)"
             :current-member="currentMember"
+            :players="players"
             :first-scorer="getPlayer(prediction.firstScorerPlayerId)"
             :predicted-members="predictionMembersFor(prediction.matchId)"
           />

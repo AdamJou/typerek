@@ -23,6 +23,13 @@ export function isPredictionLocked(match: Pick<Match, 'startsAtUtc'>, now = new 
   return now.getTime() >= new Date(match.startsAtUtc).getTime()
 }
 
+export function canRevealMatchPredictions(
+  match: Pick<Match, 'startsAtUtc' | 'status' | 'resultConfirmedAt'>,
+  now = new Date(),
+) {
+  return Boolean(match.resultConfirmedAt) || match.status === 'confirmed' || isPredictionLocked(match, now)
+}
+
 export function stageStartsAt(stageId: string, matches: readonly Pick<Match, 'stageId' | 'startsAtUtc'>[]) {
   const timestamps = matches
     .filter((match) => match.stageId === stageId)

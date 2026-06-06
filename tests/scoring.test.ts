@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Match, MatchPrediction } from '~/types/domain'
-import { defaultScoringRules, isPredictionLocked, scoreMatchPrediction, validatePredictionInput } from '~/utils/scoring'
+import {
+  canRevealMatchPredictions,
+  defaultScoringRules,
+  isPredictionLocked,
+  scoreMatchPrediction,
+  validatePredictionInput,
+} from '~/utils/scoring'
 
 const baseMatch: Match = {
   id: 'match-1',
@@ -79,6 +85,26 @@ describe('prediction guards', () => {
   it('locks predictions at kickoff time', () => {
     expect(isPredictionLocked(baseMatch, new Date('2026-06-11T18:59:59Z'))).toBe(false)
     expect(isPredictionLocked(baseMatch, new Date('2026-06-11T19:00:00Z'))).toBe(true)
+  })
+
+  it('reveals player predictions only from kickoff', () => {
+    const scheduledMatch = {
+      ...baseMatch,
+      status: 'scheduled' as const,
+      resultConfirmedAt: null,
+    }
+
+    expect(canRevealMatchPredictions(scheduledMatch, new Date('2026-06-11T18:59:59Z'))).toBe(false)
+    expect(canRevealMatchPredictions(scheduledMatch, new Date('2026-06-11T19:00:00Z'))).toBe(true)
+  })
+
+  it('reveals player predictions when an admin confirms a result early', () => {
+    const confirmedMatch = {
+      ...baseMatch,
+      startsAtUtc: '2026-06-12T19:00:00Z',
+    }
+
+    expect(canRevealMatchPredictions(confirmedMatch, new Date('2026-06-11T19:00:00Z'))).toBe(true)
   })
 
   it('requires no scorer only with 0:0', () => {

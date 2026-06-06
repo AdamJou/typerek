@@ -163,6 +163,10 @@ function ownPredictionFor(matchId: string) {
   return predictions.value.find((prediction) => prediction.matchId === matchId && prediction.userId === currentUserId.value)
 }
 
+function predictionsFor(matchId: string) {
+  return predictions.value.filter((prediction) => prediction.matchId === matchId)
+}
+
 function matchEventsFor(matchId: string) {
   return matchEvents.filter((event) => event.matchId === matchId)
 }
@@ -365,7 +369,9 @@ function bonusCardMessage() {
           :stage="stageFor(match.stageId)!"
           :to="`/matches/${match.id}`"
           :prediction="ownPredictionFor(match.id)"
+          :match-predictions="predictionsFor(match.id)"
           :current-member="currentMember"
+          :players="players"
           :first-scorer="getPlayer(ownPredictionFor(match.id)?.firstScorerPlayerId ?? null)"
           :attention="needsAttention(match)"
           :pending="needsPrediction(match)"

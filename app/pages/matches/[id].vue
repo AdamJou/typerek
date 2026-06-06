@@ -32,6 +32,9 @@ const savedMessage = shallowRef('')
 const existingPrediction = computed(() =>
   predictions.value.find((prediction) => prediction.matchId === match.value?.id && prediction.userId === currentUserId.value),
 )
+const currentMatchPredictions = computed(() =>
+  predictions.value.filter((prediction) => prediction.matchId === match.value?.id),
+)
 const hasBothTeams = computed(() => Boolean(matchTeams.value?.homeTeam && matchTeams.value?.awayTeam))
 const canPredict = computed(() => hasBothTeams.value && hasLeague.value && Boolean(currentUserId.value))
 const stageOpen = computed(() => (match.value ? isStagePredictionOpen(match.value.stageId, stages, matches) : false))
@@ -122,7 +125,9 @@ async function savePrediction(prediction: Parameters<typeof upsertLocalPredictio
       :away-team="matchTeams?.awayTeam"
       :stage="stage"
       :prediction="existingPrediction"
+      :match-predictions="currentMatchPredictions"
       :current-member="currentMember"
+      :players="players"
       :first-scorer="getPlayer(existingPrediction?.firstScorerPlayerId ?? null)"
       :pending="canShowPending"
       :locked-label="lockedLabel"

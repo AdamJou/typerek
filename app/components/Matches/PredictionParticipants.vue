@@ -5,11 +5,16 @@ const props = withDefaults(
   defineProps<{
     members: readonly LeagueMember[]
     limit?: number
+    interactive?: boolean
   }>(),
   {
     limit: 12,
   },
 )
+
+const emit = defineEmits<{
+  select: [member: LeagueMember]
+}>()
 
 const colors = ['#0c6b46', '#2878d0', '#7656e8', '#d9822b', '#c44569', '#168c8c', '#59636e', '#8b5e3c']
 const visibleMembers = computed(() => {
@@ -32,19 +37,36 @@ function memberColor(member: LeagueMember) {
 
   return colors[Math.abs(hash) % colors.length]
 }
+
+function selectMember(event: MouseEvent | KeyboardEvent, member: LeagueMember) {
+  if (!props.interactive) {
+    return
+  }
+
+  event.preventDefault()
+  event.stopPropagation()
+  emit('select', member)
+}
 </script>
 
 <template>
   <div v-if="props.members.length" class="prediction-participants" :aria-label="participantsLabel">
     <span class="participants-label">Typowali</span>
 
-    <div class="participant-stack" aria-hidden="true">
+    <div class="participant-stack" :aria-hidden="props.interactive ? undefined : 'true'">
       <span
         v-for="member in visibleMembers"
         :key="member.userId"
         class="participant-avatar"
+        :class="{ 'is-interactive': props.interactive }"
         :style="{ backgroundColor: memberColor(member) }"
         :title="member.displayName"
+        :role="props.interactive ? 'button' : undefined"
+        :tabindex="props.interactive ? 0 : undefined"
+        :aria-label="props.interactive ? `Pokaż typ gracza ${member.displayName}` : undefined"
+        @click="selectMember($event, member)"
+        @keydown.enter="selectMember($event, member)"
+        @keydown.space="selectMember($event, member)"
       >
         {{ initials(member.displayName) }}
       </span>
@@ -96,6 +118,23 @@ function memberColor(member: LeagueMember) {
 
 .participant-avatar + .participant-avatar {
   margin-left: -10px;
+}
+
+.participant-avatar.is-interactive {
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.participant-avatar.is-interactive:hover,
+.participant-avatar.is-interactive:focus-visible {
+  z-index: 2;
+  outline: 0;
+  box-shadow:
+    0 0 0 3px rgba(12, 107, 70, 0.2),
+    0 3px 8px rgba(20, 33, 27, 0.2);
+  transform: translateY(-2px);
 }
 
 .participant-more {
