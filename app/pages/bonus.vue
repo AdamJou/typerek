@@ -135,18 +135,21 @@ async function saveAllAnswers() {
   saveState.value = 'saving'
   saveMessage.value = 'Zapisuję odpowiedzi bonusowe...'
 
-  try {
-    for (const questionId of dirtyQuestionIds.value) {
-      const question = resolvedQuestions.value.find((candidate) => candidate.id === questionId)
+  const questionIdsToSave = [...dirtyQuestionIds.value]
+  const failedQuestionIds: string[] = []
 
-      if (!question) {
-        continue
-      }
+  for (const questionId of questionIdsToSave) {
+    const question = resolvedQuestions.value.find((candidate) => candidate.id === questionId)
 
-      const answerJson = drafts.value[questionId] ?? null
-      const filled = isBonusAnswerFilled(question, answerJson)
-      const savedPrediction = predictionByQuestionId.value.get(questionId)
+    if (!question) {
+      continue
+    }
 
+    const answerJson = drafts.value[questionId] ?? null
+    const filled = isBonusAnswerFilled(question, answerJson)
+    const savedPrediction = predictionByQuestionId.value.get(questionId)
+
+    try {
       if (!filled) {
         if (savedPrediction) {
           await deleteBonusPrediction(questionId)
@@ -159,14 +162,19 @@ async function saveAllAnswers() {
         questionId,
         answerJson,
       })
+    } catch {
+      failedQuestionIds.push(questionId)
     }
+  }
 
+  if (failedQuestionIds.length === 0) {
     saveState.value = 'saved'
     saveMessage.value = 'Odpowiedzi bonusowe zapisane.'
-  } catch (error) {
-    saveState.value = 'error'
-    saveMessage.value = error instanceof Error ? error.message : 'Nie udało się zapisać odpowiedzi bonusowych.'
+    return
   }
+
+  saveState.value = 'error'
+  saveMessage.value = `Nie udało się zapisać ${failedQuestionIds.length} z ${questionIdsToSave.length} odpowiedzi. Spróbuj ponownie.`
 }
 </script>
 
@@ -229,7 +237,7 @@ async function saveAllAnswers() {
               :teams="teams"
               :players="players"
               :stages="stages"
-              :disabled="locked"
+              :disabled="locked || saveState === 'saving'"
               @update:model-value="updateDraft(question.id, $event)"
             />
           </BonusQuestionCard>

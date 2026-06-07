@@ -195,6 +195,20 @@ export function isBonusAnswerFilled(question: ResolvedBonusQuestion, answerJson:
   }
 }
 
+export function normalizeBonusNumericValue(value: string | number, maxValue: number) {
+  if (value === '') {
+    return null
+  }
+
+  const numericValue = typeof value === 'number' ? value : Number(value)
+
+  if (!Number.isFinite(numericValue)) {
+    return null
+  }
+
+  return Math.max(0, Math.min(maxValue, Math.trunc(numericValue)))
+}
+
 export function filledBonusCount(questions: readonly ResolvedBonusQuestion[], predictions: readonly BonusPrediction[]) {
   return questions.reduce((count, question) => {
     const prediction = predictions.find((candidate) => candidate.questionId === question.id)
@@ -204,10 +218,6 @@ export function filledBonusCount(questions: readonly ResolvedBonusQuestion[], pr
 
 export function defaultAnswerForQuestion(question: ResolvedBonusQuestion, teams: readonly Team[]) {
   switch (question.kind) {
-    case 'numeric':
-    case 'player_numeric':
-    case 'team_numeric':
-      return { value: 0 }
     case 'ranked_group_table':
       return { groups: emptyGroupAnswer(teams) }
     default:

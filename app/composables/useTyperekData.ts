@@ -19,6 +19,7 @@ import type {
   TournamentStage,
 } from '~/types/domain'
 import type {
+  CreateBonusQuestionPayload,
   SetMatchResultPayload,
   UpsertBonusPredictionPayload,
   UpsertMatchPredictionPayload,
@@ -97,6 +98,19 @@ export function useTyperekData() {
     bonusPredictions.value = bonusPredictions.value.filter((prediction) => prediction.questionId !== questionId)
   }
 
+  async function createBonusQuestion(payload: CreateBonusQuestionPayload) {
+    const repository = getRepository()
+    const savedQuestion = await repository.createBonusQuestion(payload)
+    await refresh()
+    return savedQuestion
+  }
+
+  async function deleteBonusQuestion(questionId: string) {
+    const repository = getRepository()
+    await repository.deleteBonusQuestion(questionId)
+    await refresh()
+  }
+
   async function deletePrediction(matchId: string) {
     const repository = getRepository()
     await repository.deleteMatchPrediction(matchId)
@@ -153,6 +167,8 @@ export function useTyperekData() {
     deletePrediction,
     upsertBonusPrediction,
     deleteBonusPrediction,
+    createBonusQuestion,
+    deleteBonusQuestion,
     setMatchResult,
   }
 }

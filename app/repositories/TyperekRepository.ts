@@ -42,6 +42,19 @@ export interface UpsertBonusPredictionPayload {
   answerJson: Record<string, unknown> | null
 }
 
+export interface CreateBonusQuestionPayload {
+  leagueId: string
+  title: string
+  points: number
+  deadlineAt: string
+  lockAt?: string | null
+  displayOrder?: number | null
+  slug?: string | null
+  kind: NonNullable<BonusQuestion['kind']>
+  sourceKind: NonNullable<BonusQuestion['sourceKind']>
+  configJson?: NonNullable<BonusQuestion['configJson']>
+}
+
 export interface TyperekDataSnapshot {
   tournament: Tournament
   league: League | null
@@ -696,6 +709,37 @@ export class TyperekRepository {
 
   async deleteBonusPrediction(questionId: string) {
     const { error } = await this.supabase.rpc('delete_bonus_prediction', {
+      p_question_id: questionId,
+    })
+
+    if (error) {
+      throw error
+    }
+  }
+
+  async createBonusQuestion(payload: CreateBonusQuestionPayload) {
+    const { data, error } = await this.supabase.rpc('create_bonus_question_admin', {
+      p_league_id: payload.leagueId,
+      p_title: payload.title,
+      p_points: payload.points,
+      p_deadline_at: payload.deadlineAt,
+      p_lock_at: payload.lockAt ?? null,
+      p_display_order: payload.displayOrder ?? null,
+      p_slug: payload.slug ?? null,
+      p_kind: payload.kind,
+      p_source_kind: payload.sourceKind,
+      p_config_json: payload.configJson ?? {},
+    })
+
+    if (error) {
+      throw error
+    }
+
+    return mapBonusQuestion(data as BonusQuestionRow)
+  }
+
+  async deleteBonusQuestion(questionId: string) {
+    const { error } = await this.supabase.rpc('delete_bonus_question_admin', {
       p_question_id: questionId,
     })
 

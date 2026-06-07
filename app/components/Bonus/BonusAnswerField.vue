@@ -8,6 +8,7 @@ import {
   emptyGroupAnswer,
   fixedSubjectLabel,
   groupedTeams,
+  normalizeBonusNumericValue,
   optionsForQuestion,
   questionKindLabel,
   stageOptions,
@@ -51,10 +52,10 @@ function setBoolean(value: boolean) {
   setAnswer({ value })
 }
 
-function setNumericValue(value: number) {
+function setNumericValue(value: string | number) {
   const maxValue = typeof props.question.configJson.maxValue === 'number' ? props.question.configJson.maxValue : 99
-  const nextValue = Math.max(0, Math.min(maxValue, Number.isFinite(value) ? Math.trunc(value) : 0))
-  setAnswer({ value: nextValue })
+  const nextValue = normalizeBonusNumericValue(value, maxValue)
+  setAnswer(nextValue === null ? null : { value: nextValue })
 }
 
 function stepNumeric(delta: number) {
@@ -132,8 +133,8 @@ function resetGroups() {
         type="number"
         min="0"
         :max="question.configJson.maxValue ?? 99"
-        :value="typeof model?.value === 'number' ? model.value : 0"
-        @input="setNumericValue(Number(($event.target as HTMLInputElement).value))"
+        :value="typeof model?.value === 'number' ? model.value : ''"
+        @input="setNumericValue(($event.target as HTMLInputElement).value)"
       />
       <button class="step-button" type="button" :disabled="disabled" @click="stepNumeric(1)">
         <Plus :size="16" aria-hidden="true" />
