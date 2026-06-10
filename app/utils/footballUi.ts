@@ -306,6 +306,19 @@ export function sortPlayersForScorerSelect(players: readonly Player[]) {
   })
 }
 
+export function compareMatchesChronologically(
+  left: Pick<Match, 'startsAtUtc' | 'matchNumber'>,
+  right: Pick<Match, 'startsAtUtc' | 'matchNumber'>,
+) {
+  const kickoffDelta = new Date(left.startsAtUtc).getTime() - new Date(right.startsAtUtc).getTime()
+
+  if (kickoffDelta !== 0) {
+    return kickoffDelta
+  }
+
+  return (left.matchNumber ?? Number.MAX_SAFE_INTEGER) - (right.matchNumber ?? Number.MAX_SAFE_INTEGER)
+}
+
 export function isMatchToday(match: Pick<Match, 'startsAtUtc' | 'status'>, now = new Date()) {
   if (match.status !== 'scheduled') {
     return false

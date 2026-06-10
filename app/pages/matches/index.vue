@@ -2,7 +2,7 @@
 import { Save } from 'lucide-vue-next'
 import type { Match, TournamentStage } from '~/types/domain'
 import type { BulkPredictionDraft } from '~/components/Predictions/BulkPredictionEditor.vue'
-import { isMatchToday } from '~/utils/footballUi'
+import { compareMatchesChronologically, isMatchToday } from '~/utils/footballUi'
 import { currentPredictionStageId, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen } from '~/utils/scoring'
 
 type MatchViewMode = 'pending' | 'all' | 'bulk'
@@ -29,21 +29,12 @@ const stageTabs = computed(() => {
 
   return stages.filter((stage) => stage.id === currentStageId.value)
 })
-const pendingMatches = computed(() => matches.filter((match) => needsPrediction(match)))
+const sortedMatches = computed(() => [...matches].sort(compareMatchesChronologically))
+const pendingMatches = computed(() => sortedMatches.value.filter((match) => needsPrediction(match)))
 const bulkMatches = computed(() =>
-  [...matches]
-    .filter((match) => match.stageId === currentStageId.value && needsPrediction(match))
-    .sort((left, right) => {
-      const numberDelta = (left.matchNumber ?? Number.MAX_SAFE_INTEGER) - (right.matchNumber ?? Number.MAX_SAFE_INTEGER)
-
-      if (numberDelta !== 0) {
-        return numberDelta
-      }
-
-      return left.startsAtUtc.localeCompare(right.startsAtUtc)
-    }),
+  sortedMatches.value.filter((match) => match.stageId === currentStageId.value && needsPrediction(match)),
 )
-const modeMatches = computed(() => (activeMode.value === 'pending' || activeMode.value === 'bulk' ? pendingMatches.value : matches))
+const modeMatches = computed(() => (activeMode.value === 'pending' || activeMode.value === 'bulk' ? pendingMatches.value : sortedMatches.value))
 const visibleMatches = computed(() =>
   activeStageId.value ? modeMatches.value.filter((match) => match.stageId === activeStageId.value) : modeMatches.value,
 )
