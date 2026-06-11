@@ -24,7 +24,7 @@ import type {
   UpsertBonusPredictionPayload,
   UpsertMatchPredictionPayload,
 } from '~/repositories/TyperekRepository'
-import { aggregateRanking, currentPredictionStageId } from '~/utils/scoring'
+import { aggregateRanking, currentPredictionStageId, resolveRankingBreakdowns } from '~/utils/scoring'
 
 const tournament = reactive<Tournament>(emptyTournament())
 const league = reactive<League>(emptyLeague())
@@ -49,13 +49,16 @@ const errorMessage = shallowRef('')
 let loadPromise: Promise<void> | null = null
 
 export function useTyperekData() {
-  const ranking = computed(() => aggregateRanking(scoreBreakdowns.value, members))
+  const rankingBreakdowns = computed(() =>
+    resolveRankingBreakdowns(scoreBreakdowns.value, matches, predictions.value, matchEvents),
+  )
+  const ranking = computed(() => aggregateRanking(rankingBreakdowns.value, members))
   const currentStage = computed(() => {
     const activeStageId = currentPredictionStageId(stages, matches)
 
     return stages.find((stage) => stage.id === activeStageId) ?? stages[0] ?? null
   })
-  const currentStageRanking = computed(() => aggregateRanking(scoreBreakdowns.value, members, currentStage.value?.id))
+  const currentStageRanking = computed(() => aggregateRanking(rankingBreakdowns.value, members, currentStage.value?.id))
   const hasLeague = computed(() => Boolean(league.id))
 
   if (import.meta.client && !hasLoaded.value && !isLoading.value) {
@@ -153,6 +156,7 @@ export function useTyperekData() {
     bonusResolutions: readonly(bonusResolutions),
     synchronizationLogs: readonly(synchronizationLogs),
     scoreBreakdowns: readonly(scoreBreakdowns),
+    rankingBreakdowns,
     ranking,
     currentStage,
     currentStageRanking,

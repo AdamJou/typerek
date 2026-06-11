@@ -145,15 +145,18 @@ export function scoreMatchPrediction(
       : 0
 
   const wasGoalless = match.homeScore90 === 0 && match.awayScore90 === 0
+  const effectiveMatchEvents = matchEvents.some((event) => event.matchId === match.id && event.provider === 'manual')
+    ? matchEvents.filter((event) => event.matchId === match.id && event.provider === 'manual')
+    : matchEvents.filter((event) => event.matchId === match.id)
   const normalGoalScorerIds = new Set(
-    matchEvents
-      .filter((event) => event.matchId === match.id && event.eventType === 'goal' && !isOwnGoal(event))
+    effectiveMatchEvents
+      .filter((event) => event.eventType === 'goal' && !isOwnGoal(event))
       .map((event) => event.playerId)
       .filter((playerId): playerId is string => Boolean(playerId)),
   )
   const firstNormalScorerId =
-    matchEvents
-      .filter((event) => event.matchId === match.id && event.eventType === 'goal' && !isOwnGoal(event) && event.playerId)
+    effectiveMatchEvents
+      .filter((event) => event.eventType === 'goal' && !isOwnGoal(event) && event.playerId)
       .sort((left, right) => left.minute - right.minute || left.createdAt.localeCompare(right.createdAt))[0]?.playerId ?? match.firstScorerPlayerId
   const firstScorerPoints =
     (prediction.noScorer && wasGoalless) ||
@@ -190,28 +193,94 @@ function isOwnGoal(event: MatchEvent) {
   return event.detail === 'manual_own_goal' || event.detail === 'own_goal'
 }
 
+export function resolveRankingBreakdowns(
+  breakdowns: readonly ScoreBreakdown[],
+  matches: readonly Match[],
+  predictions: readonly MatchPrediction[],
+  matchEvents: readonly MatchEvent[],
+) {
+  const bonusBreakdowns = breakdowns.filter((row) => row.sourceType === 'bonus')
+  const matchesById = new Map(matches.map((match) => [match.id, match]))
+  const eventsByMatchId = new Map<string, MatchEvent[]>()
+
+  for (const event of matchEvents) {
+    const current = eventsByMatchId.get(event.matchId) ?? []
+    current.push(event)
+    eventsByMatchId.set(event.matchId, current)
+  }
+
+  const matchBreakdowns = predictions.flatMap((prediction) => {
+    const match = matchesById.get(prediction.matchId)
+
+    if (!match?.resultConfirmedAt || match.homeScore90 === null || match.awayScore90 === null) {
+      return []
+    }
+
+    return [
+      scoreMatchPrediction(
+        match,
+        prediction,
+        defaultScoringRules,
+        eventsByMatchId.get(match.id) ?? [],
+      ),
+    ]
+  })
+
+  return [...matchBreakdowns, ...bonusBreakdowns]
+}
+
 export function aggregateRanking(
   breakdowns: readonly ScoreBreakdown[],
   members: readonly { userId: string; displayName: string }[],
   stageId?: string,
 ) {
-  return members
+  const sortedRows = members
     .map((member) => {
       const userBreakdowns = breakdowns.filter((row) => row.userId === member.userId)
       const stageBreakdowns = stageId ? userBreakdowns.filter((row) => row.stageId === stageId) : userBreakdowns
       const visibleBreakdowns = stageId ? stageBreakdowns : userBreakdowns
+      const visibleMatchBreakdowns = visibleBreakdowns.filter((row) => row.sourceType === 'match')
+      const visibleBonusBreakdowns = visibleBreakdowns.filter((row) => row.sourceType === 'bonus')
       const visibleTotalPoints = visibleBreakdowns.reduce((sum, row) => sum + row.totalPoints, 0)
+      const generalPoints = userBreakdowns.reduce((sum, row) => sum + row.totalPoints, 0)
 
       return {
         userId: member.userId,
         displayName: member.displayName,
+        generalPoints,
         totalPoints: visibleTotalPoints,
-        stagePoints: stageBreakdowns.reduce((sum, row) => sum + row.totalPoints, 0),
         outcomePoints: visibleBreakdowns.reduce((sum, row) => sum + row.outcomePoints, 0),
         exactScorePoints: visibleBreakdowns.reduce((sum, row) => sum + row.exactScorePoints, 0),
-        firstScorerPoints: visibleBreakdowns.reduce((sum, row) => sum + row.firstScorerPoints, 0),
-        bonusPoints: visibleBreakdowns.reduce((sum, row) => sum + row.bonusPoints, 0),
+        firstScorerPoints: visibleMatchBreakdowns.reduce(
+          (sum, row) => sum + row.firstScorerPoints + row.bonusPoints,
+          0,
+        ),
+        bonusPoints: visibleBonusBreakdowns.reduce((sum, row) => sum + row.bonusPoints, 0),
       }
     })
-    .sort((a, b) => b.totalPoints - a.totalPoints || a.displayName.localeCompare(b.displayName, 'pl'))
+    .sort(
+      (a, b) =>
+        b.totalPoints - a.totalPoints ||
+        (stageId ? b.generalPoints - a.generalPoints : 0) ||
+        a.displayName.localeCompare(b.displayName, 'pl'),
+    )
+
+  let previousPosition = 0
+
+  return sortedRows.map((row, index) => {
+    const previousRow = sortedRows[index - 1]
+    const sharesPosition =
+      previousRow !== undefined &&
+      row.totalPoints === previousRow.totalPoints &&
+      (!stageId || row.generalPoints === previousRow.generalPoints)
+    const position = sharesPosition ? previousPosition : index + 1
+    const { generalPoints: _generalPoints, ...rankingRow } = row
+
+    previousPosition = position
+
+    return {
+      ...rankingRow,
+      position,
+    }
+  })
 }

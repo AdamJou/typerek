@@ -20,6 +20,8 @@ const props = defineProps<{
   pending?: boolean
   lockedLabel?: string | null
   predictedMembers?: readonly LeagueMember[]
+  predictionLabel?: string
+  predictionPlaceholder?: string
 }>()
 
 const cardComponent = computed(() => (props.to ? resolveComponent('NuxtLink') : 'article'))
@@ -396,7 +398,7 @@ onBeforeUnmount(() => {
         'is-miss': predictionResultState === 'miss',
       }"
     >
-      <span class="prediction-label">Twój typ</span>
+      <span class="prediction-label">{{ props.predictionLabel ?? 'Twój typ' }}</span>
       <strong class="prediction-score">{{ predictionScoreLabel(props.prediction) }}</strong>
       <div class="prediction-scorer">
         <img src="~/assets/css/shooting.png" alt="" class="scorer-icon" aria-hidden="true" />
@@ -412,6 +414,11 @@ onBeforeUnmount(() => {
           <X v-else :size="15" aria-hidden="true" />
         </span>
       </div>
+    </div>
+
+    <div v-else-if="props.predictionPlaceholder" class="prediction-strip prediction-strip-empty">
+      <span class="prediction-label">{{ props.predictionLabel ?? 'Typ' }}</span>
+      <strong class="prediction-score">{{ props.predictionPlaceholder }}</strong>
     </div>
 
     <div v-if="props.to" class="match-card-action">
@@ -724,6 +731,15 @@ onBeforeUnmount(() => {
 .prediction-strip.is-miss {
   border-color: #e7b5ad;
   background: #fff1ef;
+}
+
+.prediction-strip-empty {
+  grid-template-columns: auto minmax(0, 1fr);
+  background: var(--app-bg);
+}
+
+.prediction-strip-empty .prediction-score {
+  color: var(--app-muted);
 }
 
 .prediction-label {

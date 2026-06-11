@@ -4,6 +4,7 @@ import type {
   BonusQuestion,
   BonusQuestionOption,
   BonusQuestionResolution,
+  BonusStatisticsSnapshot,
   League,
   LeagueMember,
   Match,
@@ -18,6 +19,7 @@ import type {
   Tournament,
   TournamentStage,
 } from '~/types/domain'
+import { normalizeBonusStatisticsSnapshot } from '~/utils/statistics'
 
 export interface UpsertMatchPredictionPayload {
   matchId: string
@@ -224,6 +226,13 @@ interface BonusQuestionResolutionRow {
   source_status: BonusQuestionResolution['sourceStatus']
   note: string | null
   updated_at: string
+}
+
+interface BonusStatisticsSnapshotRow {
+  league_id: string
+  generated_at: string
+  member_count: number
+  statistics_json: unknown
 }
 
 interface ScoreBreakdownRow {
@@ -692,6 +701,60 @@ export class TyperekRepository {
     }
 
     return data ? mapMatchPrediction(data as MatchPredictionRow) : null
+  }
+
+  async listRevealedMatchPredictions(leagueId: string, userId: string, matchIds: string[]) {
+    if (matchIds.length === 0) {
+      return []
+    }
+
+    const rows = await this.fetchPaged<MatchPredictionRow>((from, to) =>
+      this.supabase
+        .from('match_predictions')
+        .select(
+          'id, league_id, user_id, match_id, predicted_home_score, predicted_away_score, first_scorer_player_id, no_scorer, updated_at',
+        )
+        .eq('league_id', leagueId)
+        .eq('user_id', userId)
+        .in('match_id', matchIds)
+        .order('updated_at', { ascending: false })
+        .range(from, to),
+    )
+
+    return rows.map(mapMatchPrediction)
+  }
+
+  async listRevealedBonusPredictions(questionIds: string[], userId: string) {
+    return this.listBonusPredictions(questionIds, userId)
+  }
+
+  async getBonusStatisticsSnapshot(leagueId: string): Promise<BonusStatisticsSnapshot | null> {
+    const { data, error } = await this.supabase
+      .from('league_bonus_statistics')
+      .select('league_id, generated_at, member_count, statistics_json')
+      .eq('league_id', leagueId)
+      .maybeSingle()
+
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205') {
+        return null
+      }
+
+      throw error
+    }
+
+    if (!data) {
+      return null
+    }
+
+    const row = data as BonusStatisticsSnapshotRow
+
+    return normalizeBonusStatisticsSnapshot({
+      leagueId: row.league_id,
+      generatedAt: row.generated_at,
+      memberCount: row.member_count,
+      statisticsJson: row.statistics_json,
+    })
   }
 
   async upsertBonusPrediction(payload: UpsertBonusPredictionPayload) {

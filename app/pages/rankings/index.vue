@@ -2,14 +2,14 @@
 import { ChevronDown } from 'lucide-vue-next'
 import { aggregateRanking } from '~/utils/scoring'
 
-const { currentStage, matches, members, ranking, scoreBreakdowns, stages } = useTyperekData()
+const { currentStage, matches, members, ranking, rankingBreakdowns, stages } = useTyperekData()
 
 const activeStageId = shallowRef('')
 
 const orderedStages = computed(() => [...stages].sort((left, right) => left.sortOrder - right.sortOrder))
 const selectedStageId = computed(() => activeStageId.value || currentStage.value?.id || orderedStages.value[0]?.id || '')
 const selectedStage = computed(() => orderedStages.value.find((stage) => stage.id === selectedStageId.value) ?? null)
-const selectedStageRanking = computed(() => aggregateRanking(scoreBreakdowns.value, members, selectedStageId.value || undefined))
+const selectedStageRanking = computed(() => aggregateRanking(rankingBreakdowns.value, members, selectedStageId.value || undefined))
 const selectedStageMatchCount = computed(() => matches.filter((match) => match.stageId === selectedStageId.value).length)
 
 watch(

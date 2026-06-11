@@ -6,17 +6,22 @@ const props = defineProps<{
   rows: readonly RankingRow[]
 }>()
 
-const podiumRows = computed(() => props.rows.slice(0, 3))
+const podiumRows = computed(() => props.rows.filter((row) => row.position <= 3))
 </script>
 
 <template>
   <div class="podium-grid">
-    <article v-for="(row, index) in podiumRows" :key="row.userId" class="podium-card panel">
+    <NuxtLink
+      v-for="row in podiumRows"
+      :key="row.userId"
+      class="podium-card panel"
+      :to="`/participants/${row.userId}`"
+    >
       <Medal :size="22" aria-hidden="true" />
-      <span class="podium-place">{{ index + 1 }}.</span>
+      <span class="podium-place">{{ row.position }}.</span>
       <strong>{{ row.displayName }}</strong>
       <small>{{ row.totalPoints }} pkt</small>
-    </article>
+    </NuxtLink>
   </div>
 </template>
 
@@ -32,6 +37,17 @@ const podiumRows = computed(() => props.rows.slice(0, 3))
   align-items: center;
   gap: 10px;
   padding: 14px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.podium-card:hover,
+.podium-card:focus-visible {
+  border-color: rgba(12, 107, 70, 0.38);
+  box-shadow: 0 18px 46px rgba(26, 42, 34, 0.12);
+  transform: translateY(-1px);
 }
 
 .podium-card svg,

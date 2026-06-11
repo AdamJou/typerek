@@ -147,8 +147,8 @@ export interface ScoreBreakdown {
 export interface RankingRow {
   userId: string
   displayName: string
+  position: number
   totalPoints: number
-  stagePoints: number
   outcomePoints: number
   exactScorePoints: number
   firstScorerPoints: number
@@ -188,16 +188,16 @@ export interface BonusQuestionConfig {
   subjectLabel?: string
   subjectPlayerName?: string
   subjectTeamName?: string
-  playerNames?: string[]
-  teamNames?: string[]
-  hostTeamNames?: string[]
-  comparisonOptions?: Array<{
+  playerNames?: readonly string[]
+  teamNames?: readonly string[]
+  hostTeamNames?: readonly string[]
+  comparisonOptions?: ReadonlyArray<{
     key: string
     label: string
   }>
   threshold?: number
   maxValue?: number
-  stageCodes?: string[]
+  stageCodes?: readonly string[]
   groupSize?: number
   maxSelections?: number
   helperText?: string
@@ -245,6 +245,36 @@ export interface BonusPrediction {
   answerJson: Record<string, unknown> | null
   optionId?: string | null
   updatedAt: string
+}
+
+export type BonusStatisticEntityType = 'team' | 'player' | 'choice'
+
+export type BonusStatisticMetric = 'answer' | 'top4_presence'
+
+export type BonusStatisticSection = 'featured' | 'awards' | 'duels' | 'insights'
+
+export interface BonusStatisticOption {
+  key: string
+  count: number
+  averagePosition?: number | null
+}
+
+export interface BonusStatisticCard {
+  questionSlug: string
+  title: string
+  entityType: BonusStatisticEntityType
+  metric: BonusStatisticMetric
+  section: BonusStatisticSection
+  respondentCount: number
+  options: BonusStatisticOption[]
+}
+
+export interface BonusStatisticsSnapshot {
+  leagueId: string
+  generatedAt: string
+  memberCount: number
+  version: number
+  cards: BonusStatisticCard[]
 }
 
 export interface SynchronizationLog {

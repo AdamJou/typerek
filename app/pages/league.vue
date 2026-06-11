@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CalendarClock, CalendarDays, CircleAlert, Clock3, Medal, TicketCheck, Users, ChevronRight } from 'lucide-vue-next'
+import { BarChart3, CalendarClock, CalendarDays, CircleAlert, Clock3, Medal, TicketCheck, Users, ChevronRight } from 'lucide-vue-next'
 import type { Match } from '~/types/domain'
 import { isMatchToday } from '~/utils/footballUi'
 import { filledBonusCount, isBonusAnswerFilled, isBonusLocked, resolveBonusGlobalLockAt, resolveBonusQuestion } from '~/utils/bonus'
@@ -203,7 +203,7 @@ function bonusCardMessage() {
   }
 
   if (bonusLocked.value) {
-    return 'Typowanie bonusowe jest zamknięte. Kliknij, żeby zobaczyć swoje odpowiedzi.'
+    return ''
   }
 
   if (bonusDirty.value) {
@@ -292,6 +292,17 @@ function bonusCardMessage() {
       </article>
       <NuxtLink
         v-if="hasLeague"
+        to="/statistics"
+        class="summary-tile summary-tile-basic summary-tile-link panel"
+      >
+        <div class="summary-tile-icon" aria-hidden="true">
+          <BarChart3 :size="22" />
+        </div>
+        <strong>Analizy ligi</strong>
+        <span>statystyki typów</span>
+      </NuxtLink>
+      <NuxtLink
+        v-if="hasLeague"
         to="/bonus"
         class="summary-tile summary-tile-bonus panel"
         :class="{ 'needs-action': !bonusLocked && bonusDirty, locked: bonusLocked }"
@@ -307,7 +318,7 @@ function bonusCardMessage() {
         <div class="summary-tile-meta">
           <strong>{{ bonusAnsweredCount }}/{{ bonusTotalCount }}</strong>
           <span v-if="bonusRemainingLabel" class="summary-tile-timer">{{ bonusRemainingLabel }}</span>
-          <span v-else-if="bonusLocked" class="summary-tile-timer">Termin minął‚</span>
+          <span v-else-if="bonusLocked" class="summary-tile-timer">Termin minął</span>
           <span v-else class="summary-tile-timer">Do terminu</span>
         </div>
         <span>pytania bonusowe</span>
@@ -661,6 +672,20 @@ function bonusCardMessage() {
     box-shadow 160ms ease;
 }
 
+.summary-tile-link {
+  color: inherit;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.summary-tile-link:hover,
+.summary-tile-link:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(12, 107, 70, 0.35);
+}
+
 .summary-tile-bonus:hover {
   transform: translateY(-1px);
 }
@@ -862,7 +887,7 @@ function bonusCardMessage() {
   }
 
   .summary-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .match-list {

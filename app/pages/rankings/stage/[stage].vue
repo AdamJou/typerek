@@ -2,9 +2,9 @@
 import { aggregateRanking } from '~/utils/scoring'
 
 const route = useRoute()
-const { members, scoreBreakdowns, stages } = useTyperekData()
+const { members, rankingBreakdowns, stages } = useTyperekData()
 const activeStage = computed(() => stages.find((stage) => stage.id === route.params.stage))
-const rows = computed(() => aggregateRanking(scoreBreakdowns.value, members, activeStage.value?.id))
+const rows = computed(() => aggregateRanking(rankingBreakdowns.value, members, activeStage.value?.id))
 </script>
 
 <template>

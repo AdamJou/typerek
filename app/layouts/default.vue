@@ -9,8 +9,7 @@ const currentStagePosition = computed(() => {
     return null
   }
 
-  const rankingIndex = currentStageRanking.value.findIndex((row) => row.userId === currentUserId.value)
-  return rankingIndex >= 0 ? rankingIndex + 1 : null
+  return currentStageRanking.value.find((row) => row.userId === currentUserId.value)?.position ?? null
 })
 
 await init()

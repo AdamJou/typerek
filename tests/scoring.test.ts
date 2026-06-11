@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { Match, MatchPrediction } from '~/types/domain'
+import type { Match, MatchEvent, MatchPrediction, ScoreBreakdown } from '~/types/domain'
 import {
+  aggregateRanking,
   canRevealMatchPredictions,
   defaultScoringRules,
   isPredictionLocked,
+  resolveRankingBreakdowns,
   scoreMatchPrediction,
   validatePredictionInput,
 } from '~/utils/scoring'
@@ -81,6 +83,188 @@ describe('scoreMatchPrediction', () => {
   })
 })
 
+describe('aggregateRanking', () => {
+  it('combines the scorer point and first-goal bonus in the scorer column', () => {
+    const breakdowns: ScoreBreakdown[] = [
+      {
+        leagueId: 'league-1',
+        userId: 'jurson',
+        sourceType: 'match',
+        sourceId: 'match-1',
+        stageId: 'stage-1',
+        outcomePoints: 2,
+        exactScorePoints: 0,
+        firstScorerPoints: 1,
+        bonusPoints: 2,
+        totalPoints: 5,
+      },
+      {
+        leagueId: 'league-1',
+        userId: 'jurson',
+        sourceType: 'bonus',
+        sourceId: 'question-1',
+        stageId: null,
+        outcomePoints: 0,
+        exactScorePoints: 0,
+        firstScorerPoints: 0,
+        bonusPoints: 4,
+        totalPoints: 4,
+      },
+    ]
+
+    const [row] = aggregateRanking(breakdowns, [{ userId: 'jurson', displayName: 'Jurson' }])
+
+    expect(row?.firstScorerPoints).toBe(3)
+    expect(row?.bonusPoints).toBe(4)
+    expect(row?.totalPoints).toBe(9)
+  })
+
+  it('keeps legacy match breakdowns with all scorer points in one field correct', () => {
+    const breakdowns: ScoreBreakdown[] = [
+      {
+        leagueId: 'league-1',
+        userId: 'jurson',
+        sourceType: 'match',
+        sourceId: 'match-1',
+        stageId: 'stage-1',
+        outcomePoints: 2,
+        exactScorePoints: 0,
+        firstScorerPoints: 3,
+        bonusPoints: 0,
+        totalPoints: 5,
+      },
+    ]
+
+    const [row] = aggregateRanking(breakdowns, [{ userId: 'jurson', displayName: 'Jurson' }])
+
+    expect(row?.firstScorerPoints).toBe(3)
+    expect(row?.totalPoints).toBe(5)
+  })
+
+  it('assigns the same general position to players tied on points', () => {
+    const breakdowns: ScoreBreakdown[] = [
+      scoreBreakdown('adam', 'stage-1', 8),
+      scoreBreakdown('beta', 'stage-1', 8),
+      scoreBreakdown('charlie', 'stage-1', 5),
+    ]
+
+    const ranking = aggregateRanking(breakdowns, [
+      { userId: 'adam', displayName: 'Adam' },
+      { userId: 'beta', displayName: 'Beta' },
+      { userId: 'charlie', displayName: 'Charlie' },
+    ])
+
+    expect(ranking.map((row) => [row.userId, row.position])).toEqual([
+      ['adam', 1],
+      ['beta', 1],
+      ['charlie', 3],
+    ])
+  })
+
+  it('uses general points as the live-stage tie-breaker', () => {
+    const breakdowns: ScoreBreakdown[] = [
+      scoreBreakdown('adam', 'stage-1', 5),
+      scoreBreakdown('adam', 'stage-previous', 2),
+      scoreBreakdown('beta', 'stage-1', 5),
+      scoreBreakdown('beta', 'stage-previous', 7),
+      scoreBreakdown('charlie', 'stage-1', 5),
+      scoreBreakdown('charlie', 'stage-previous', 7),
+      scoreBreakdown('delta', 'stage-1', 3),
+    ]
+
+    const ranking = aggregateRanking(
+      breakdowns,
+      [
+        { userId: 'adam', displayName: 'Adam' },
+        { userId: 'beta', displayName: 'Beta' },
+        { userId: 'charlie', displayName: 'Charlie' },
+        { userId: 'delta', displayName: 'Delta' },
+      ],
+      'stage-1',
+    )
+
+    expect(ranking.map((row) => [row.userId, row.position])).toEqual([
+      ['beta', 1],
+      ['charlie', 1],
+      ['adam', 3],
+      ['delta', 4],
+    ])
+  })
+})
+
+describe('resolveRankingBreakdowns', () => {
+  it('awards Adam 1 scorer point and Jurson 3 when Jurson predicted the first scorer', () => {
+    const match: Match = {
+      ...baseMatch,
+      homeScore90: 2,
+      awayScore90: 0,
+      firstScorerPlayerId: 'quinones',
+    }
+    const events: MatchEvent[] = [
+      {
+        id: 'goal-1',
+        matchId: match.id,
+        provider: 'manual',
+        providerEventId: 'goal-1',
+        eventType: 'goal',
+        minute: 1,
+        extraMinute: null,
+        teamId: 'team-home',
+        playerId: 'quinones',
+        playerName: 'J. Quiñones',
+        detail: 'manual_goal',
+        createdAt: '2026-06-11T19:01:00Z',
+      },
+      {
+        id: 'goal-2',
+        matchId: match.id,
+        provider: 'manual',
+        providerEventId: 'goal-2',
+        eventType: 'goal',
+        minute: 2,
+        extraMinute: null,
+        teamId: 'team-home',
+        playerId: 'jimenez',
+        playerName: 'R. Jiménez',
+        detail: 'manual_goal',
+        createdAt: '2026-06-11T19:02:00Z',
+      },
+    ]
+    const predictions = [
+      prediction({
+        id: 'adam-prediction',
+        userId: 'adam',
+        predictedHomeScore: 2,
+        predictedAwayScore: 0,
+        firstScorerPlayerId: 'jimenez',
+      }),
+      prediction({
+        id: 'jurson-prediction',
+        userId: 'jurson',
+        predictedHomeScore: 2,
+        predictedAwayScore: 1,
+        firstScorerPlayerId: 'quinones',
+      }),
+    ]
+
+    const ranking = aggregateRanking(
+      resolveRankingBreakdowns([], [match], predictions, events),
+      [
+        { userId: 'adam', displayName: 'Adam' },
+        { userId: 'jurson', displayName: 'Jurson' },
+      ],
+    )
+
+    const adam = ranking.find((row) => row.userId === 'adam')
+    const jurson = ranking.find((row) => row.userId === 'jurson')
+
+    expect(adam?.firstScorerPoints).toBe(1)
+    expect(adam?.totalPoints).toBe(8)
+    expect(jurson?.firstScorerPoints).toBe(3)
+    expect(jurson?.totalPoints).toBe(5)
+  })
+})
+
 describe('prediction guards', () => {
   it('locks predictions at kickoff time', () => {
     expect(isPredictionLocked(baseMatch, new Date('2026-06-11T18:59:59Z'))).toBe(false)
@@ -118,3 +302,18 @@ describe('prediction guards', () => {
     ).toBe('Opcja braku strzelca jest dozwolona tylko przy typie 0:0.')
   })
 })
+
+function scoreBreakdown(userId: string, stageId: string, totalPoints: number): ScoreBreakdown {
+  return {
+    leagueId: 'league-1',
+    userId,
+    sourceType: 'match',
+    sourceId: `${userId}-${stageId}`,
+    stageId,
+    outcomePoints: totalPoints,
+    exactScorePoints: 0,
+    firstScorerPoints: 0,
+    bonusPoints: 0,
+    totalPoints,
+  }
+}

@@ -4,7 +4,7 @@ import { BONUS_QUESTION_CATALOG } from '~/data/bonusQuestionCatalog'
 import { formatShortDate } from '~/utils/date'
 import { questionKindLabel, resolveBonusGlobalLockAt, resolveBonusQuestion } from '~/utils/bonus'
 
-const { bonusQuestions, bonusResolutions, matches, players, stages, teams, tournament } = useTyperekData()
+const { bonusQuestions, bonusResolutions, league, matches, players, stages, teams, tournament } = useTyperekData()
 
 const resolvedQuestions = computed(() => bonusQuestions.map((question) => resolveBonusQuestion(question)))
 const resolutionsByQuestionId = computed(() => new Map(bonusResolutions.map((resolution) => [resolution.questionId, resolution])))
@@ -34,6 +34,8 @@ const tournamentLockLabel = computed(() => {
         Katalog pytań, typy odpowiedzi i status źródeł danych dla pełnego systemu bonusów. Deadline wszystkich pytań: {{ tournamentLockLabel }}.
       </p>
     </div>
+
+    <AdminBonusExport :league-id="league.id" :league-name="league.name" />
 
     <div class="stats-grid">
       <article class="stat-card panel">

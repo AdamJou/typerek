@@ -416,8 +416,12 @@ function firstScorerBonusPoints(row: ResultPlayerRow) {
   return row.scorerFirstBonus ? defaultScoringRules.firstScorerBonusPoints : 0
 }
 
+function totalScorerPoints(row: ResultPlayerRow) {
+  return scorerPoints(row) + firstScorerBonusPoints(row)
+}
+
 function totalPoints(row: ResultPlayerRow) {
-  return outcomePoints(row) + exactScorePoints(row) + scorerPoints(row) + firstScorerBonusPoints(row)
+  return outcomePoints(row) + exactScorePoints(row) + totalScorerPoints(row)
 }
 
 function scoreLabel(row: ResultPlayerRow) {
@@ -796,7 +800,6 @@ function normalizeSearch(value: string) {
                       <th>Wynik</th>
                       <th>Dokł.</th>
                       <th>Strz.</th>
-                      <th>Bonus</th>
                       <th>Suma</th>
                     </tr>
                   </thead>
@@ -825,8 +828,7 @@ function normalizeSearch(value: string) {
                       </td>
                       <td>{{ outcomePoints(playerRow) }}</td>
                       <td>{{ exactScorePoints(playerRow) }}</td>
-                      <td>{{ scorerPoints(playerRow) }}</td>
-                      <td>{{ firstScorerBonusPoints(playerRow) }}</td>
+                      <td>{{ totalScorerPoints(playerRow) }}</td>
                       <td>
                         <strong class="total-points">{{ totalPoints(playerRow) }}</strong>
                       </td>
@@ -867,8 +869,7 @@ function normalizeSearch(value: string) {
                   <div class="mobile-points">
                     <span>W/D/L {{ outcomePoints(playerRow) }}</span>
                     <span>Dokł. {{ exactScorePoints(playerRow) }}</span>
-                    <span>Strz. {{ scorerPoints(playerRow) }}</span>
-                    <span>Bonus {{ firstScorerBonusPoints(playerRow) }}</span>
+                    <span>Strz. {{ totalScorerPoints(playerRow) }}</span>
                   </div>
                 </article>
               </div>
