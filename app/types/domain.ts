@@ -249,14 +249,38 @@ export interface BonusPrediction {
 
 export type BonusStatisticEntityType = 'team' | 'player' | 'choice'
 
-export type BonusStatisticMetric = 'answer' | 'top4_presence'
+export type BonusStatisticMetric =
+  | 'answer'
+  | 'top4_presence'
+  | 'numeric_distribution'
+  | 'group_consensus'
 
-export type BonusStatisticSection = 'featured' | 'awards' | 'duels' | 'insights'
+export type BonusStatisticSection =
+  | 'featured'
+  | 'awards'
+  | 'duels'
+  | 'sentiments'
+  | 'picks'
+  | 'forecasts'
+  | 'groups'
+  | 'insights'
 
 export interface BonusStatisticOption {
   key: string
   count: number
   averagePosition?: number | null
+}
+
+export interface BonusStatisticGroupTeam {
+  key: string
+  averagePosition: number
+  positionVotes: number[]
+}
+
+export interface BonusStatisticGroup {
+  groupCode: string
+  respondentCount: number
+  teams: BonusStatisticGroupTeam[]
 }
 
 export interface BonusStatisticCard {
@@ -267,6 +291,9 @@ export interface BonusStatisticCard {
   section: BonusStatisticSection
   respondentCount: number
   options: BonusStatisticOption[]
+  averageValue?: number | null
+  medianValue?: number | null
+  groups?: BonusStatisticGroup[]
 }
 
 export interface BonusStatisticsSnapshot {

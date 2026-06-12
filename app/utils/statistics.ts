@@ -2,6 +2,7 @@ import type {
   BonusQuestion,
   BonusStatisticCard,
   BonusStatisticEntityType,
+  BonusStatisticGroup,
   BonusStatisticMetric,
   BonusStatisticSection,
   BonusStatisticsSnapshot,
@@ -9,7 +10,7 @@ import type {
   Team,
   TournamentStage,
 } from '~/types/domain'
-import { duelOptions, resolveBonusQuestion, stageOptions } from '~/utils/bonus'
+import { duelOptions, normalizeBonusText, resolveBonusQuestion, stageOptions } from '~/utils/bonus'
 import { displayTeamName, formatPlayerDisplayName, getTeamFlag, type TeamFlagAsset } from '~/utils/footballUi'
 
 export interface BonusStatisticsSnapshotRowInput {
@@ -33,8 +34,31 @@ export interface ResolvedBonusStatisticCard extends Omit<BonusStatisticCard, 'op
 }
 
 const entityTypes = new Set<BonusStatisticEntityType>(['team', 'player', 'choice'])
-const metrics = new Set<BonusStatisticMetric>(['answer', 'top4_presence'])
-const sections = new Set<BonusStatisticSection>(['featured', 'awards', 'duels', 'insights'])
+const metrics = new Set<BonusStatisticMetric>([
+  'answer',
+  'top4_presence',
+  'numeric_distribution',
+  'group_consensus',
+])
+const sections = new Set<BonusStatisticSection>([
+  'featured',
+  'awards',
+  'duels',
+  'sentiments',
+  'picks',
+  'forecasts',
+  'groups',
+  'insights',
+])
+const sentimentQuestionSlugs = new Set([
+  'q04-curacao-group-points',
+  'q12-neymar-over-240-minutes',
+  'q20-modric-goal',
+  'q22-son-over-1-goal',
+  'q33-chris-wood-goal',
+  'q36-australia-win-any-match',
+  'q39-ekstraklasa-goal-or-assist',
+])
 
 export function normalizeBonusStatisticsSnapshot(
   row: BonusStatisticsSnapshotRowInput,
@@ -113,7 +137,13 @@ export function resolveBonusStatisticsCards(
           flag: team ? getTeamFlag(team) : null,
         }
       })
-      .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label, 'pl'))
+      .sort((left, right) => {
+        if (card.metric === 'numeric_distribution') {
+          return Number(left.key) - Number(right.key)
+        }
+
+        return right.count - left.count || left.label.localeCompare(right.label, 'pl')
+      })
 
     return {
       ...card,
@@ -150,6 +180,8 @@ function normalizeCard(value: unknown): BonusStatisticCard | null {
     metric,
     section,
     respondentCount: toNonNegativeInteger(value.respondentCount),
+    averageValue: toOptionalNumber(value.averageValue),
+    medianValue: toOptionalNumber(value.medianValue),
     options: Array.isArray(value.options)
       ? value.options.flatMap((option) => {
           if (!isRecord(option) || typeof option.key !== 'string' || !option.key.trim()) {
@@ -168,7 +200,53 @@ function normalizeCard(value: unknown): BonusStatisticCard | null {
             : []
         })
       : [],
+    groups: Array.isArray(value.groups)
+      ? value.groups
+          .map(normalizeGroup)
+          .filter((group): group is BonusStatisticGroup => Boolean(group))
+          .sort((left, right) => left.groupCode.localeCompare(right.groupCode, 'pl'))
+      : [],
   }
+}
+
+export function classifyBonusStatisticSection(
+  question: Pick<BonusQuestion, 'slug' | 'title' | 'kind'>,
+): BonusStatisticSection {
+  const slug = question.slug ?? ''
+  const title = normalizeBonusText(question.title)
+
+  if (['q02-world-cup-winner', 'q24-top-four'].includes(slug)) {
+    return 'featured'
+  }
+
+  if (
+    ['q05-top-scorer', 'q06-top-assists', 'q07-golden-glove'].includes(slug)
+    || title.includes('mvp')
+  ) {
+    return 'awards'
+  }
+
+  if (question.kind === 'ranked_group_table') {
+    return 'groups'
+  }
+
+  if (
+    question.kind === 'boolean'
+    || sentimentQuestionSlugs.has(slug)
+    || (title.includes('haaland') && title.includes('uzbekistan'))
+  ) {
+    return 'sentiments'
+  }
+
+  if (['duel_player', 'duel_team', 'comparison_numeric'].includes(question.kind ?? '')) {
+    return 'duels'
+  }
+
+  if (['team_single', 'player_single', 'team_stage_exit'].includes(question.kind ?? '')) {
+    return 'picks'
+  }
+
+  return 'forecasts'
 }
 
 function inferStatisticSection(questionSlug: string): BonusStatisticSection {
@@ -187,6 +265,50 @@ function inferStatisticSection(questionSlug: string): BonusStatisticSection {
   return 'insights'
 }
 
+function normalizeGroup(value: unknown): BonusStatisticGroup | null {
+  if (!isRecord(value) || typeof value.groupCode !== 'string' || !value.groupCode.trim()) {
+    return null
+  }
+
+  return {
+    groupCode: value.groupCode.trim(),
+    respondentCount: toNonNegativeInteger(value.respondentCount),
+    teams: Array.isArray(value.teams)
+      ? value.teams.flatMap((team) => {
+          if (!isRecord(team) || typeof team.key !== 'string' || !team.key.trim()) {
+            return []
+          }
+
+          const averagePosition = toPositiveNumber(team.averagePosition)
+
+          if (averagePosition === null) {
+            return []
+          }
+
+          const positionVotes = Array.from({ length: 4 }, (_, index) =>
+            toNonNegativeInteger(
+              Array.isArray(team.positionVotes) ? team.positionVotes[index] : 0,
+            ),
+          )
+
+          return [{
+            key: team.key.trim(),
+            averagePosition,
+            positionVotes,
+          }]
+        })
+          .sort((left, right) =>
+            left.averagePosition - right.averagePosition
+            || right.positionVotes[0]! - left.positionVotes[0]!
+            || right.positionVotes[1]! - left.positionVotes[1]!
+            || right.positionVotes[2]! - left.positionVotes[2]!
+            || right.positionVotes[3]! - left.positionVotes[3]!
+            || left.key.localeCompare(right.key, 'pl'),
+          )
+      : [],
+  }
+}
+
 function toNonNegativeInteger(value: unknown) {
   const numericValue = typeof value === 'number' ? value : Number(value)
 
@@ -197,6 +319,18 @@ function toPositiveNumber(value: unknown) {
   const numericValue = typeof value === 'number' ? value : Number(value)
 
   return Number.isFinite(numericValue) && numericValue > 0
+    ? Math.round(numericValue * 100) / 100
+    : null
+}
+
+function toOptionalNumber(value: unknown) {
+  if (value === null || value === undefined || value === '') {
+    return null
+  }
+
+  const numericValue = typeof value === 'number' ? value : Number(value)
+
+  return Number.isFinite(numericValue)
     ? Math.round(numericValue * 100) / 100
     : null
 }

@@ -1,19 +1,41 @@
 <script setup lang="ts">
 import type { ResolvedBonusStatisticCard } from '~/utils/statistics'
 
-defineProps<{
+const props = defineProps<{
   card: ResolvedBonusStatisticCard
   memberCount: number
   compact?: boolean
   featured?: boolean
 }>()
+
+const averageValueLabel = computed(() => formatMetric(props.card.averageValue))
+const medianValueLabel = computed(() => formatMetric(props.card.medianValue))
+
+function formatMetric(value: number | null | undefined) {
+  return value?.toLocaleString('pl-PL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }) ?? ''
+}
 </script>
 
 <template>
   <article class="statistics-card panel" :class="{ compact, featured }">
     <header>
       <h2>{{ card.title }}</h2>
+      <span>{{ card.respondentCount }}/{{ memberCount }} odpowiedziało</span>
     </header>
+
+    <div v-if="card.metric === 'numeric_distribution' && (averageValueLabel || medianValueLabel)" class="numeric-summary">
+      <div>
+        <span>Średnia</span>
+        <strong>{{ averageValueLabel }}</strong>
+      </div>
+      <div>
+        <span>Mediana</span>
+        <strong>{{ medianValueLabel }}</strong>
+      </div>
+    </div>
 
     <div v-if="card.options.length" class="statistics-options">
       <StatisticsBarRow
@@ -71,6 +93,32 @@ defineProps<{
 .statistics-options {
   display: grid;
   gap: 16px;
+}
+
+.numeric-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.numeric-summary > div {
+  display: grid;
+  gap: 3px;
+  border-radius: 8px;
+  background: #eef5ef;
+  padding: 10px 12px;
+}
+
+.numeric-summary span {
+  color: var(--app-muted);
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.numeric-summary strong {
+  color: var(--app-primary-dark);
+  font-size: 20px;
 }
 
 .statistics-empty,

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { BarChart3, CalendarClock, LockKeyhole } from 'lucide-vue-next'
-import type { BonusStatisticsSnapshot } from '~/types/domain'
-import { formatShortDate } from '~/utils/date'
+import { BarChart3, LockKeyhole } from 'lucide-vue-next'
+import type { BonusStatisticSection, BonusStatisticsSnapshot } from '~/types/domain'
 import { resolveBonusStatisticsCards } from '~/utils/statistics'
 
+const route = useRoute()
+const router = useRouter()
 const {
   bonusQuestions,
   errorMessage,
@@ -26,30 +27,72 @@ const cards = computed(() =>
     ? resolveBonusStatisticsCards(snapshot.value, bonusQuestions, teams, players, stages)
     : [],
 )
-const featuredCards = computed(() => cards.value.filter((card) => card.section === 'featured'))
-const statisticsSections = computed(() => [
-  {
-    key: 'awards',
-    eyebrow: 'Najważniejsze wyróżnienia',
-    title: 'Turniejowe nagrody',
-    cards: cards.value.filter((card) => card.section === 'awards'),
-  },
-  {
-    key: 'duels',
-    eyebrow: 'Ligowe pojedynki',
-    title: 'Kto postawił na kogo?',
-    cards: cards.value.filter((card) => card.section === 'duels'),
-  },
-  {
-    key: 'insights',
-    eyebrow: 'Drugi tier',
-    title: 'Sentymenty i ciekawostki',
-    cards: cards.value.filter((card) => card.section === 'insights'),
-  },
-].filter((section) => section.cards.length > 0))
-const generatedAtLabel = computed(() =>
-  snapshot.value ? formatShortDate(snapshot.value.generatedAt) : '',
+
+const categoryDefinitions: Array<{
+  key: BonusStatisticSection
+  label: string
+  eyebrow: string
+  title: string
+}> = [
+  { key: 'featured', label: 'Topka', eyebrow: 'Topka ligi', title: 'Najważniejsze prognozy' },
+  { key: 'awards', label: 'Nagrody', eyebrow: 'Najważniejsze wyróżnienia', title: 'Turniejowe nagrody' },
+  { key: 'duels', label: 'Pojedynki', eyebrow: 'Ligowe pojedynki', title: 'Kto postawił na kogo?' },
+  { key: 'sentiments', label: 'Sentymenty', eyebrow: 'Tak czy nie?', title: 'Nastroje ligi' },
+  { key: 'picks', label: 'Wybory', eyebrow: 'Drużyny i zawodnicy', title: 'Najczęstsze wybory' },
+  { key: 'forecasts', label: 'Liczby', eyebrow: 'Prognozy liczbowe', title: 'Jakich wyników oczekuje liga?' },
+  { key: 'groups', label: 'Grupy', eyebrow: 'Wspólny typ', title: 'Grupy według ligi' },
+  { key: 'insights', label: 'Ciekawostki', eyebrow: 'Starszy snapshot', title: 'Sentymenty i ciekawostki' },
+]
+
+const categoryItems = computed(() =>
+  categoryDefinitions
+    .map((category) => ({
+      ...category,
+      count: cards.value.filter((card) => card.section === category.key).length,
+    }))
+    .filter((category) => category.count > 0),
 )
+const activeCategory = computed<BonusStatisticSection>(() => {
+  const requestedCategory = String(route.query.category ?? '')
+  const requested = categoryItems.value.find((category) => category.key === requestedCategory)
+
+  return requested?.key
+    ?? categoryItems.value.find((category) => category.key === 'featured')?.key
+    ?? categoryItems.value[0]?.key
+    ?? 'featured'
+})
+const activeCategoryDefinition = computed(() =>
+  categoryItems.value.find((category) => category.key === activeCategory.value),
+)
+const activeCards = computed(() =>
+  cards.value.filter((card) => card.section === activeCategory.value),
+)
+
+watch(
+  [() => route.query.category, () => categoryItems.value.map((category) => category.key).join(',')],
+  () => {
+    if (categoryItems.value.length === 0 || route.query.category === activeCategory.value) {
+      return
+    }
+
+    void router.replace({
+      query: {
+        ...route.query,
+        category: activeCategory.value,
+      },
+    })
+  },
+  { immediate: true },
+)
+
+function selectCategory(category: BonusStatisticSection) {
+  void router.replace({
+    query: {
+      ...route.query,
+      category,
+    },
+  })
+}
 
 async function loadSnapshot() {
   const currentRequestId = ++requestId
@@ -117,40 +160,43 @@ watch([() => league.id, hasLoaded], loadSnapshot, { immediate: true })
 
       <template v-else-if="snapshot">
         <div v-if="cards.length" class="statistics-sections">
-          <section v-if="featuredCards.length" class="statistics-section">
+          <StatisticsCategoryTabs
+            :items="categoryItems"
+            :active-key="activeCategory"
+            @select="selectCategory"
+          />
+
+          <section v-if="activeCategoryDefinition" class="statistics-section">
             <div class="section-heading">
-              <span>Topka ligi</span>
-              <h2>Najważniejsze prognozy</h2>
+              <span>{{ activeCategoryDefinition.eyebrow }}</span>
+              <h2>{{ activeCategoryDefinition.title }}</h2>
             </div>
 
-            <div class="statistics-grid featured-grid">
+            <div
+              v-if="activeCategory !== 'groups'"
+              class="statistics-grid"
+              :class="{
+                'featured-grid': activeCategory === 'featured',
+                comparisons: activeCategory === 'duels',
+              }"
+            >
               <StatisticsDistributionCard
-                v-for="card in featuredCards"
+                v-for="card in activeCards"
                 :key="card.questionSlug"
                 :card="card"
                 :member-count="snapshot.memberCount"
                 :featured="card.questionSlug === 'q02-world-cup-winner'"
+                :compact="activeCategory === 'duels'"
               />
             </div>
-          </section>
 
-          <section
-            v-for="section in statisticsSections"
-            :key="section.key"
-            class="statistics-section"
-          >
-            <div class="section-heading">
-              <span>{{ section.eyebrow }}</span>
-              <h2>{{ section.title }}</h2>
-            </div>
-
-            <div class="statistics-grid" :class="{ comparisons: section.key === 'duels' }">
-              <StatisticsDistributionCard
-                v-for="card in section.cards"
+            <div v-else class="group-consensus-list">
+              <StatisticsGroupConsensusCard
+                v-for="card in activeCards"
                 :key="card.questionSlug"
                 :card="card"
                 :member-count="snapshot.memberCount"
-                :compact="section.key === 'duels'"
+                :teams="teams"
               />
             </div>
           </section>
@@ -182,7 +228,8 @@ watch([() => league.id, hasLoaded], loadSnapshot, { immediate: true })
 .statistics-page,
 .statistics-content,
 .statistics-sections,
-.statistics-section {
+.statistics-section,
+.group-consensus-list {
   display: grid;
   gap: 18px;
 }
@@ -239,34 +286,6 @@ watch([() => league.id, hasLoaded], loadSnapshot, { immediate: true })
   color: rgba(255, 255, 255, 0.78);
   font-size: 14px;
   font-weight: 700;
-}
-
-.snapshot-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 14px 16px;
-}
-
-.snapshot-meta > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.snapshot-meta svg {
-  color: var(--app-primary);
-}
-
-.snapshot-meta span {
-  color: var(--app-muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.snapshot-meta strong {
-  font-size: 13px;
 }
 
 .section-heading {
@@ -326,9 +345,7 @@ watch([() => league.id, hasLoaded], loadSnapshot, { immediate: true })
 }
 
 @media (max-width: 620px) {
-  .statistics-hero,
-  .snapshot-meta,
-  .snapshot-meta > div {
+  .statistics-hero {
     align-items: start;
     flex-direction: column;
   }
