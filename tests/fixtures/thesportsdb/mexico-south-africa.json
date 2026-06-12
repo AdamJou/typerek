@@ -1,0 +1,61 @@
+{
+  "event": {
+    "idEvent": "2391728",
+    "idLeague": "4429",
+    "strSeason": "2026",
+    "strEvent": "Mexico vs South Africa",
+    "strHomeTeam": "Mexico",
+    "strAwayTeam": "South Africa",
+    "idHomeTeam": "134497",
+    "idAwayTeam": "136482",
+    "intHomeScore": "2",
+    "intAwayScore": "0",
+    "strTimestamp": "2026-06-11T19:00:00",
+    "strStatus": "FT",
+    "strVenue": "Estadio Azteca"
+  },
+  "timeline": [
+    {
+      "idTimeline": "1795984",
+      "idEvent": "2391728",
+      "strTimeline": "Goal",
+      "strTimelineDetail": "Normal Goal",
+      "idPlayer": "34177457",
+      "strPlayer": "Julián Quiñones",
+      "intTime": "9",
+      "idTeam": "134497",
+      "strTeam": "Mexico"
+    },
+    {
+      "idTimeline": "1795985",
+      "idEvent": "2391728",
+      "strTimeline": "Card",
+      "strTimelineDetail": "Yellow Card",
+      "idPlayer": "34228103",
+      "strPlayer": "Teboho Mokoena",
+      "intTime": "17",
+      "idTeam": "136482",
+      "strTeam": "South Africa"
+    }
+  ],
+  "lineup": [
+    {
+      "idLineup": "931374",
+      "idEvent": "2391728",
+      "strHome": "Yes",
+      "idPlayer": "34177457",
+      "strPlayer": "Julián Quiñones",
+      "idTeam": "136015",
+      "strTeam": "Al-Qadsiah"
+    }
+  ],
+  "stats": [
+    {
+      "idStatistic": "577385",
+      "idEvent": "2391728",
+      "strStat": "Shots on Goal",
+      "intHome": "4",
+      "intAway": "2"
+    }
+  ]
+}

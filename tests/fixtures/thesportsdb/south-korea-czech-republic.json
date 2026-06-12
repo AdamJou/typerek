@@ -1,0 +1,61 @@
+{
+  "event": {
+    "idEvent": "2461103",
+    "idLeague": "4429",
+    "strSeason": "2026",
+    "strEvent": "South Korea vs Czech Republic",
+    "strHomeTeam": "South Korea",
+    "strAwayTeam": "Czech Republic",
+    "idHomeTeam": "134517",
+    "idAwayTeam": "133904",
+    "intHomeScore": "2",
+    "intAwayScore": "1",
+    "strTimestamp": "2026-06-12T02:00:00",
+    "strStatus": "FT",
+    "strVenue": "Estadio Akron"
+  },
+  "timeline": [
+    {
+      "idTimeline": "1796002",
+      "idEvent": "2461103",
+      "strTimeline": "Goal",
+      "strTimelineDetail": "Normal Goal",
+      "idPlayer": "34221255",
+      "strPlayer": "Ladislav Krejčí",
+      "intTime": "59",
+      "idTeam": "133904",
+      "strTeam": "Czech Republic"
+    },
+    {
+      "idTimeline": "1796003",
+      "idEvent": "2461103",
+      "strTimeline": "subst",
+      "strTimelineDetail": "Substitution 1",
+      "idPlayer": "34174700",
+      "strPlayer": "Jae-sung Lee",
+      "intTime": "62",
+      "idTeam": "134517",
+      "strTeam": "South Korea"
+    }
+  ],
+  "lineup": [
+    {
+      "idLineup": "931397",
+      "idEvent": "2461103",
+      "strHome": "Yes",
+      "idPlayer": "34155394",
+      "strPlayer": "Heung-min Son",
+      "idTeam": "136050",
+      "strTeam": "Los Angeles FC"
+    }
+  ],
+  "stats": [
+    {
+      "idStatistic": "577403",
+      "idEvent": "2461103",
+      "strStat": "Shots on Goal",
+      "intHome": "6",
+      "intAway": "4"
+    }
+  ]
+}

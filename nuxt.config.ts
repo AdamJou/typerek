@@ -61,6 +61,9 @@ export default defineNuxtConfig({
   runtimeConfig: {
     apiFootballKey: '',
     footballDataKey: '',
+    theSportsDbApiKey: envValue('NUXT_THESPORTSDB_API_KEY', 'THESPORTSDB_API_KEY') || '123',
+    worldCup26ApiBaseUrl: envValue('WORLDCUP26_API_BASE_URL') || 'https://worldcup26.ir',
+    worldCup26ApiToken: envValue('WORLDCUP26_API_TOKEN'),
     public: {
       supabaseUrl: envValue('NUXT_PUBLIC_SUPABASE_URL', 'SUPABASE_URL'),
       supabaseKey: envValue('NUXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'SUPABASE_KEY'),

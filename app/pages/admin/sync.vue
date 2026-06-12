@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ClipboardPenLine, ListChecks } from 'lucide-vue-next'
+import { ClipboardPenLine, DatabaseZap, ListChecks } from 'lucide-vue-next'
 
 const message = shallowRef('')
 
@@ -22,6 +22,14 @@ const message = shallowRef('')
       <span>
         <strong>Pytania bonusowe</strong>
         <small>Dodawanie i usuwanie pytań zgodnych z aktualnymi typami.</small>
+      </span>
+    </NuxtLink>
+
+    <NuxtLink class="settings-card panel" to="/admin/worldcup26">
+      <DatabaseZap :size="22" aria-hidden="true" />
+      <span>
+        <strong>Audyt WorldCup26</strong>
+        <small>Podgląd wyników i kompletnej listy strzelców bez zapisu do bazy.</small>
       </span>
     </NuxtLink>
 
