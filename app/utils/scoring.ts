@@ -242,12 +242,10 @@ export function aggregateRanking(
       const visibleMatchBreakdowns = visibleBreakdowns.filter((row) => row.sourceType === 'match')
       const visibleBonusBreakdowns = visibleBreakdowns.filter((row) => row.sourceType === 'bonus')
       const visibleTotalPoints = visibleBreakdowns.reduce((sum, row) => sum + row.totalPoints, 0)
-      const generalPoints = userBreakdowns.reduce((sum, row) => sum + row.totalPoints, 0)
 
       return {
         userId: member.userId,
         displayName: member.displayName,
-        generalPoints,
         totalPoints: visibleTotalPoints,
         outcomePoints: visibleBreakdowns.reduce((sum, row) => sum + row.outcomePoints, 0),
         exactScorePoints: visibleBreakdowns.reduce((sum, row) => sum + row.exactScorePoints, 0),
@@ -261,7 +259,9 @@ export function aggregateRanking(
     .sort(
       (a, b) =>
         b.totalPoints - a.totalPoints ||
-        (stageId ? b.generalPoints - a.generalPoints : 0) ||
+        b.exactScorePoints - a.exactScorePoints ||
+        b.outcomePoints - a.outcomePoints ||
+        b.firstScorerPoints - a.firstScorerPoints ||
         a.displayName.localeCompare(b.displayName, 'pl'),
     )
 
@@ -272,14 +272,15 @@ export function aggregateRanking(
     const sharesPosition =
       previousRow !== undefined &&
       row.totalPoints === previousRow.totalPoints &&
-      (!stageId || row.generalPoints === previousRow.generalPoints)
+      row.exactScorePoints === previousRow.exactScorePoints &&
+      row.outcomePoints === previousRow.outcomePoints &&
+      row.firstScorerPoints === previousRow.firstScorerPoints
     const position = sharesPosition ? previousPosition : index + 1
-    const { generalPoints: _generalPoints, ...rankingRow } = row
 
     previousPosition = position
 
     return {
-      ...rankingRow,
+      ...row,
       position,
     }
   })

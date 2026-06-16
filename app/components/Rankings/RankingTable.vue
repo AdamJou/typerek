@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CircleHelp } from 'lucide-vue-next'
 import type { RankingRow } from '~/types/domain'
 
 const props = defineProps<{
@@ -6,12 +7,16 @@ const props = defineProps<{
   mode?: 'general' | 'stage'
 }>()
 
+const rankingRules =
+  'Top i dół etapu to 4 najwyższe i 4 najniższe wiersze po punktach. Remisy sortujemy: dokładne wyniki > wyniki > strzelcy.'
+
 const displayedRows = computed(() => {
-  const bottomPositions = new Set([...new Set(props.rows.map((row) => row.position))].slice(-4))
+  const topUserIds = new Set(props.rows.slice(0, 4).map((row) => row.userId))
+  const bottomUserIds = new Set(props.rows.slice(-4).map((row) => row.userId))
 
   return props.rows.map((row) => {
-    const isStageTop = props.mode === 'stage' && row.position <= 4
-    const isStageBottom = props.mode === 'stage' && !isStageTop && bottomPositions.has(row.position)
+    const isStageTop = props.mode === 'stage' && topUserIds.has(row.userId)
+    const isStageBottom = props.mode === 'stage' && !isStageTop && bottomUserIds.has(row.userId)
 
     return {
       row,
@@ -26,6 +31,12 @@ const displayedRows = computed(() => {
 
 <template>
   <div class="ranking-table panel">
+    <div class="ranking-table-toolbar">
+      <span class="ranking-info" tabindex="0" :aria-label="rankingRules">
+        <CircleHelp :size="16" aria-hidden="true" />
+        <span class="ranking-info-tooltip" role="tooltip">{{ rankingRules }}</span>
+      </span>
+    </div>
     <table>
       <thead>
         <tr>
@@ -63,6 +74,62 @@ const displayedRows = computed(() => {
 <style scoped>
 .ranking-table {
   overflow-x: auto;
+}
+
+.ranking-table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 4px 8px;
+}
+
+.ranking-info {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--app-line);
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--app-primary-dark);
+  cursor: help;
+}
+
+.ranking-info:focus-visible {
+  outline: 3px solid rgba(12, 107, 70, 0.18);
+  outline-offset: 2px;
+}
+
+.ranking-info-tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(340px, calc(100vw - 48px));
+  border: 1px solid rgba(12, 107, 70, 0.18);
+  border-radius: 8px;
+  background: #13231b;
+  box-shadow: 0 18px 46px rgba(26, 42, 34, 0.18);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  opacity: 0;
+  padding: 10px 12px;
+  pointer-events: none;
+  text-align: left;
+  transform: translateY(-4px);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+  white-space: normal;
+}
+
+.ranking-info:hover .ranking-info-tooltip,
+.ranking-info:focus-visible .ranking-info-tooltip {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 table {

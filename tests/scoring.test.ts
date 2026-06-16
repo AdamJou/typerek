@@ -161,13 +161,45 @@ describe('aggregateRanking', () => {
     ])
   })
 
-  it('uses general points as the live-stage tie-breaker', () => {
+  it('orders point ties by exact scores, outcomes, then scorers', () => {
     const breakdowns: ScoreBreakdown[] = [
-      scoreBreakdown('adam', 'stage-1', 5),
+      scoreBreakdown('adam', 'stage-1', 10, { exactScorePoints: 0, outcomePoints: 8, firstScorerPoints: 2 }),
+      scoreBreakdown('beta', 'stage-1', 10, { exactScorePoints: 5, outcomePoints: 2, firstScorerPoints: 3 }),
+      scoreBreakdown('charlie', 'stage-1', 10, { exactScorePoints: 5, outcomePoints: 4, firstScorerPoints: 1 }),
+      scoreBreakdown('delta', 'stage-1', 10, { exactScorePoints: 5, outcomePoints: 4, firstScorerPoints: 1 }),
+      scoreBreakdown('edek', 'stage-1', 9, { exactScorePoints: 5, outcomePoints: 4, firstScorerPoints: 0 }),
+      {
+        ...scoreBreakdown('edek', 'bonus', 1, { outcomePoints: 0, bonusPoints: 1 }),
+        sourceType: 'bonus',
+        sourceId: 'edek-bonus',
+        stageId: null,
+      },
+    ]
+
+    const ranking = aggregateRanking(breakdowns, [
+      { userId: 'adam', displayName: 'Adam' },
+      { userId: 'beta', displayName: 'Beta' },
+      { userId: 'charlie', displayName: 'Charlie' },
+      { userId: 'delta', displayName: 'Delta' },
+      { userId: 'edek', displayName: 'Edek' },
+    ])
+
+    expect(ranking.map((row) => [row.userId, row.position])).toEqual([
+      ['charlie', 1],
+      ['delta', 1],
+      ['edek', 3],
+      ['beta', 4],
+      ['adam', 5],
+    ])
+  })
+
+  it('uses stage scoring categories as the live-stage tie-breakers', () => {
+    const breakdowns: ScoreBreakdown[] = [
+      scoreBreakdown('adam', 'stage-1', 5, { exactScorePoints: 5, outcomePoints: 0, firstScorerPoints: 0 }),
       scoreBreakdown('adam', 'stage-previous', 2),
-      scoreBreakdown('beta', 'stage-1', 5),
+      scoreBreakdown('beta', 'stage-1', 5, { exactScorePoints: 0, outcomePoints: 5, firstScorerPoints: 0 }),
       scoreBreakdown('beta', 'stage-previous', 7),
-      scoreBreakdown('charlie', 'stage-1', 5),
+      scoreBreakdown('charlie', 'stage-1', 5, { exactScorePoints: 0, outcomePoints: 3, firstScorerPoints: 2 }),
       scoreBreakdown('charlie', 'stage-previous', 7),
       scoreBreakdown('delta', 'stage-1', 3),
     ]
@@ -184,9 +216,9 @@ describe('aggregateRanking', () => {
     )
 
     expect(ranking.map((row) => [row.userId, row.position])).toEqual([
-      ['beta', 1],
-      ['charlie', 1],
-      ['adam', 3],
+      ['adam', 1],
+      ['beta', 2],
+      ['charlie', 3],
       ['delta', 4],
     ])
   })
@@ -303,17 +335,22 @@ describe('prediction guards', () => {
   })
 })
 
-function scoreBreakdown(userId: string, stageId: string, totalPoints: number): ScoreBreakdown {
+function scoreBreakdown(
+  userId: string,
+  stageId: string,
+  totalPoints: number,
+  overrides: Partial<Pick<ScoreBreakdown, 'outcomePoints' | 'exactScorePoints' | 'firstScorerPoints' | 'bonusPoints'>> = {},
+): ScoreBreakdown {
   return {
     leagueId: 'league-1',
     userId,
     sourceType: 'match',
     sourceId: `${userId}-${stageId}`,
     stageId,
-    outcomePoints: totalPoints,
-    exactScorePoints: 0,
-    firstScorerPoints: 0,
-    bonusPoints: 0,
+    outcomePoints: overrides.outcomePoints ?? totalPoints,
+    exactScorePoints: overrides.exactScorePoints ?? 0,
+    firstScorerPoints: overrides.firstScorerPoints ?? 0,
+    bonusPoints: overrides.bonusPoints ?? 0,
     totalPoints,
   }
 }

@@ -703,6 +703,22 @@ export class TyperekRepository {
     return data ? mapMatchPrediction(data as MatchPredictionRow) : null
   }
 
+  async listRevealedMatchPredictionsForMatch(leagueId: string, matchId: string) {
+    const rows = await this.fetchPaged<MatchPredictionRow>((from, to) =>
+      this.supabase
+        .from('match_predictions')
+        .select(
+          'id, league_id, user_id, match_id, predicted_home_score, predicted_away_score, first_scorer_player_id, no_scorer, updated_at',
+        )
+        .eq('league_id', leagueId)
+        .eq('match_id', matchId)
+        .order('updated_at', { ascending: false })
+        .range(from, to),
+    )
+
+    return rows.map(mapMatchPrediction)
+  }
+
   async listRevealedMatchPredictions(leagueId: string, userId: string, matchIds: string[]) {
     if (matchIds.length === 0) {
       return []
