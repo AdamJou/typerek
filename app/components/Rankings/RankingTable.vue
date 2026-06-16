@@ -8,7 +8,7 @@ const props = defineProps<{
 }>()
 
 const rankingRules =
-  'Top i dół etapu to 4 najwyższe i 4 najniższe wiersze po punktach. Remisy sortujemy: dokładne wyniki > wyniki > strzelcy.'
+  'W etapie wyróżniamy 4 graczy z największą liczbą punktów i 4 graczy z najmniejszą liczbą punktów. Przy remisie decydują kolejno: dokładne wyniki, trafione wyniki, strzelcy.'
 
 const displayedRows = computed(() => {
   const topUserIds = new Set(props.rows.slice(0, 4).map((row) => row.userId))
@@ -30,14 +30,15 @@ const displayedRows = computed(() => {
 </script>
 
 <template>
-  <div class="ranking-table panel">
+  <div class="ranking-table-shell">
     <div class="ranking-table-toolbar">
       <span class="ranking-info" tabindex="0" :aria-label="rankingRules">
         <CircleHelp :size="16" aria-hidden="true" />
         <span class="ranking-info-tooltip" role="tooltip">{{ rankingRules }}</span>
       </span>
     </div>
-    <table>
+    <div class="ranking-table panel">
+      <table>
       <thead>
         <tr>
           <th>#</th>
@@ -67,11 +68,17 @@ const displayedRows = computed(() => {
           <td>{{ row.firstScorerPoints }}</td>
         </tr>
       </tbody>
-    </table>
+      </table>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.ranking-table-shell {
+  display: grid;
+  gap: 8px;
+}
+
 .ranking-table {
   overflow-x: auto;
 }
@@ -79,7 +86,7 @@ const displayedRows = computed(() => {
 .ranking-table-toolbar {
   display: flex;
   justify-content: flex-end;
-  padding: 0 4px 8px;
+  padding-inline: 4px;
 }
 
 .ranking-info {
