@@ -271,10 +271,7 @@ export function aggregateRanking(
     const previousRow = sortedRows[index - 1]
     const sharesPosition =
       previousRow !== undefined &&
-      row.totalPoints === previousRow.totalPoints &&
-      row.exactScorePoints === previousRow.exactScorePoints &&
-      row.outcomePoints === previousRow.outcomePoints &&
-      row.firstScorerPoints === previousRow.firstScorerPoints
+      row.totalPoints === previousRow.totalPoints
     const position = sharesPosition ? previousPosition : index + 1
 
     previousPosition = position

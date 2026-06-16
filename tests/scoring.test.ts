@@ -187,9 +187,9 @@ describe('aggregateRanking', () => {
     expect(ranking.map((row) => [row.userId, row.position])).toEqual([
       ['charlie', 1],
       ['delta', 1],
-      ['edek', 3],
-      ['beta', 4],
-      ['adam', 5],
+      ['edek', 1],
+      ['beta', 1],
+      ['adam', 1],
     ])
   })
 
@@ -217,8 +217,8 @@ describe('aggregateRanking', () => {
 
     expect(ranking.map((row) => [row.userId, row.position])).toEqual([
       ['adam', 1],
-      ['beta', 2],
-      ['charlie', 3],
+      ['beta', 1],
+      ['charlie', 1],
       ['delta', 4],
     ])
   })

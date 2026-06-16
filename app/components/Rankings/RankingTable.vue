@@ -8,7 +8,7 @@ const props = defineProps<{
 }>()
 
 const rankingRules =
-  'W etapie wyróżniamy 4 graczy z największą liczbą punktów i 4 graczy z najmniejszą liczbą punktów. Przy remisie decydują kolejno: dokładne wyniki, trafione wyniki, strzelcy.'
+  'W etapie wyróżniamy 4 graczy z największą i 4 graczy z najmniejszą liczbą punktów. Przy tej samej liczbie punktów kolejność w tabeli ustalają: dokładne wyniki, trafione wyniki, strzelcy.'
 
 const displayedRows = computed(() => {
   const topUserIds = new Set(props.rows.slice(0, 4).map((row) => row.userId))
