@@ -7,6 +7,7 @@ import {
   isPredictionLocked,
   resolveRankingBreakdowns,
   scoreMatchPrediction,
+  shouldUseGeneralRankingTieBreakers,
   validatePredictionInput,
 } from '~/utils/scoring'
 
@@ -221,6 +222,40 @@ describe('aggregateRanking', () => {
       ['charlie', 1],
       ['delta', 4],
     ])
+  })
+
+  it('uses general points before general scoring categories as later-stage tie-breakers', () => {
+    const breakdowns: ScoreBreakdown[] = [
+      scoreBreakdown('kuba', 'stage-2', 12, { exactScorePoints: 0, outcomePoints: 10, firstScorerPoints: 2 }),
+      scoreBreakdown('kuba', 'stage-1', 48, { exactScorePoints: 10, outcomePoints: 30, firstScorerPoints: 8 }),
+      scoreBreakdown('kwjasiek', 'stage-2', 12, { exactScorePoints: 0, outcomePoints: 10, firstScorerPoints: 2 }),
+      scoreBreakdown('kwjasiek', 'stage-1', 64, { exactScorePoints: 20, outcomePoints: 28, firstScorerPoints: 16 }),
+      scoreBreakdown('adam', 'stage-2', 12, { exactScorePoints: 2, outcomePoints: 8, firstScorerPoints: 2 }),
+      scoreBreakdown('adam', 'stage-1', 64, { exactScorePoints: 15, outcomePoints: 33, firstScorerPoints: 16 }),
+    ]
+
+    const ranking = aggregateRanking(
+      breakdowns,
+      [
+        { userId: 'kuba', displayName: 'Kuba' },
+        { userId: 'kwjasiek', displayName: 'Kwjasiek' },
+        { userId: 'adam', displayName: 'Adam' },
+      ],
+      'stage-2',
+      { useGeneralTieBreakers: true },
+    )
+
+    expect(ranking.map((row) => [row.userId, row.position])).toEqual([
+      ['kwjasiek', 1],
+      ['adam', 1],
+      ['kuba', 1],
+    ])
+  })
+
+  it('enables general tie-breakers from the second group round onward', () => {
+    expect(shouldUseGeneralRankingTieBreakers({ code: 'group_round_1' })).toBe(false)
+    expect(shouldUseGeneralRankingTieBreakers({ code: 'group_round_2' })).toBe(true)
+    expect(shouldUseGeneralRankingTieBreakers({ code: 'final' })).toBe(true)
   })
 })
 

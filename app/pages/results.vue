@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { hasLeague, matchEvents, matches, members, players, predictions, ranking, scoreBreakdowns, stages, teams } = useTyperekData()
+const { currentStage, hasLeague, matchEvents, matches, members, players, predictions, ranking, scoreBreakdowns, stages, teams } = useTyperekData()
 </script>
 
 <template>
@@ -22,6 +22,7 @@ const { hasLeague, matchEvents, matches, members, players, predictions, ranking,
       :score-breakdowns="scoreBreakdowns"
       :match-events="matchEvents"
       :ranking="ranking"
+      :default-stage-id="currentStage?.id"
       hide-heading
     />
   </section>

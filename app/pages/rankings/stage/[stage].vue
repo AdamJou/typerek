@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { aggregateRanking } from '~/utils/scoring'
+import { aggregateRanking, shouldUseGeneralRankingTieBreakers } from '~/utils/scoring'
 
 const route = useRoute()
 const { members, rankingBreakdowns, stages } = useTyperekData()
 const activeStage = computed(() => stages.find((stage) => stage.id === route.params.stage))
-const rows = computed(() => aggregateRanking(rankingBreakdowns.value, members, activeStage.value?.id))
+const rows = computed(() =>
+  aggregateRanking(rankingBreakdowns.value, members, activeStage.value?.id, {
+    useGeneralTieBreakers: shouldUseGeneralRankingTieBreakers(activeStage.value),
+  }),
+)
 </script>
 
 <template>

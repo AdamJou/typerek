@@ -7,8 +7,11 @@ const props = defineProps<{
   mode?: 'general' | 'stage'
 }>()
 
-const rankingRules =
-  'W etapie wyróżniamy 4 graczy z największą i 4 graczy z najmniejszą liczbą punktów. Przy tej samej liczbie punktów kolejność w tabeli ustalają: dokładne wyniki, trafione wyniki, strzelcy.'
+const rankingRules = computed(() =>
+  props.mode === 'stage'
+    ? 'W etapie wyróżniamy 4 graczy z największą i 4 graczy z najmniejszą liczbą punktów. Od fazy grupowej 2 przy remisie punktów z etapu kolejność ustala generalka: suma, dokładne wyniki, trafione wyniki, strzelcy.'
+    : 'Przy tej samej liczbie punktów kolejność w generalce ustalają: dokładne wyniki, trafione wyniki, strzelcy.',
+)
 
 const displayedRows = computed(() => {
   const topUserIds = new Set(props.rows.slice(0, 4).map((row) => row.userId))

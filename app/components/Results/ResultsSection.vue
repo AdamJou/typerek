@@ -64,6 +64,7 @@ const props = defineProps<{
   scoreBreakdowns: readonly ScoreBreakdown[]
   matchEvents: readonly MatchEvent[]
   ranking: readonly RankingRow[]
+  defaultStageId?: string
   hideHeading?: boolean
 }>()
 
@@ -76,6 +77,14 @@ const expandedMatchIds = shallowRef<Set<string>>(new Set())
 const teamsById = computed(() => new Map(props.teams.map((team) => [team.id, team])))
 const playersById = computed(() => new Map(props.players.map((player) => [player.id, player])))
 const rankingOrderByUserId = computed(() => new Map(props.ranking.map((row, index) => [row.userId, index])))
+const orderedStages = computed(() => [...props.stages].sort((left, right) => left.sortOrder - right.sortOrder))
+const resolvedDefaultStageId = computed(() => {
+  if (props.defaultStageId && props.stages.some((stage) => stage.id === props.defaultStageId)) {
+    return props.defaultStageId
+  }
+
+  return orderedStages.value[0]?.id ?? ''
+})
 const orderedMembers = computed(() =>
   [...props.members].sort((left, right) => {
     const leftOrder = rankingOrderByUserId.value.get(left.userId) ?? Number.MAX_SAFE_INTEGER
@@ -88,18 +97,18 @@ const confirmedMatches = computed(() =>
   props.matches
     .filter((match) => isConfirmedResult(match))
     .sort((left, right) => {
-      const numberDelta = (left.matchNumber ?? Number.MAX_SAFE_INTEGER) - (right.matchNumber ?? Number.MAX_SAFE_INTEGER)
+      const timeDelta = matchSortTime(right) - matchSortTime(left)
 
-      if (numberDelta !== 0) {
-        return numberDelta
+      if (timeDelta !== 0) {
+        return timeDelta
       }
 
-      return left.startsAtUtc.localeCompare(right.startsAtUtc)
+      return (right.matchNumber ?? 0) - (left.matchNumber ?? 0)
     }),
 )
 const resultGroups = computed<ResultStageGroup[]>(() =>
   [...props.stages]
-    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .sort((left, right) => right.sortOrder - left.sortOrder)
     .map((stage) => ({
       stage,
       matches: confirmedMatches.value.filter((match) => match.stageId === stage.id).map((match) => buildMatchRow(match)),
@@ -108,9 +117,9 @@ const resultGroups = computed<ResultStageGroup[]>(() =>
 )
 const hasResults = computed(() => resultGroups.value.length > 0)
 const stageOptions = computed<FilterOption[]>(() =>
-  resultGroups.value.map((group) => ({
-    value: group.stage.id,
-    label: group.stage.name,
+  orderedStages.value.map((stage) => ({
+    value: stage.id,
+    label: stage.name,
   })),
 )
 const roundOptions = computed<FilterOption[]>(() => {
@@ -160,7 +169,12 @@ const filteredMatchRows = computed(() => filteredResultGroups.value.flatMap((gro
 const filteredMatchIds = computed(() => filteredMatchRows.value.map((row) => row.match.id))
 const hasFilteredResults = computed(() => filteredMatchRows.value.length > 0)
 const hasActiveFilters = computed(() =>
-  Boolean(activeStageId.value || activeRoundLabel.value || activeTeamId.value || searchQuery.value.trim()),
+  Boolean(
+    activeStageId.value !== resolvedDefaultStageId.value ||
+      activeRoundLabel.value ||
+      activeTeamId.value ||
+      searchQuery.value.trim(),
+  ),
 )
 const resultStats = computed(() => {
   const rows = filteredMatchRows.value
@@ -198,6 +212,28 @@ watch(
     }
 
     expandedMatchIds.value = matchIds[0] ? new Set([matchIds[0]]) : new Set()
+  },
+  { immediate: true },
+)
+
+const hasInitializedDefaultStage = shallowRef(false)
+const previousDefaultStageId = shallowRef('')
+
+watch(
+  [resolvedDefaultStageId, stageOptions],
+  ([defaultStageId, options]) => {
+    const validStageIds = new Set(options.map((option) => option.value))
+    const shouldUseDefault =
+      !hasInitializedDefaultStage.value ||
+      activeStageId.value === previousDefaultStageId.value ||
+      Boolean(activeStageId.value && !validStageIds.has(activeStageId.value))
+
+    if (shouldUseDefault) {
+      activeStageId.value = validStageIds.has(defaultStageId) ? defaultStageId : ''
+    }
+
+    hasInitializedDefaultStage.value = true
+    previousDefaultStageId.value = defaultStageId
   },
   { immediate: true },
 )
@@ -265,6 +301,12 @@ function isConfirmedResult(match: Match) {
     match.homeScore90 !== null &&
     match.awayScore90 !== null
   )
+}
+
+function matchSortTime(match: Match) {
+  const timestamp = new Date(match.startsAtUtc).getTime()
+
+  return Number.isFinite(timestamp) ? timestamp : 0
 }
 
 function teamFor(teamId: string | null) {
@@ -542,7 +584,7 @@ function toggleMatch(matchId: string) {
 }
 
 function clearFilters() {
-  activeStageId.value = ''
+  activeStageId.value = resolvedDefaultStageId.value
   activeRoundLabel.value = ''
   activeTeamId.value = ''
   searchQuery.value = ''

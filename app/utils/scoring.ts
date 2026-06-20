@@ -1,4 +1,4 @@
-import type { Match, MatchEvent, MatchPrediction, ScoreBreakdown, ScoringRules } from '~/types/domain'
+import type { Match, MatchEvent, MatchPrediction, RankingRow, ScoreBreakdown, ScoringRules, TournamentStage } from '~/types/domain'
 
 export const defaultScoringRules: ScoringRules = {
   resultPoints: 2,
@@ -6,6 +6,26 @@ export const defaultScoringRules: ScoringRules = {
   firstScorerPoints: 1,
   firstScorerBonusPoints: 2,
 }
+
+const generalTieBreakerStageCodes: readonly TournamentStage['code'][] = [
+  'group_round_2',
+  'group_round_3',
+  'round_of_32',
+  'round_of_16',
+  'quarter_finals',
+  'semi_finals',
+  'third_place',
+  'final',
+]
+
+interface AggregateRankingOptions {
+  useGeneralTieBreakers?: boolean
+}
+
+type RankingStats = Pick<
+  RankingRow,
+  'totalPoints' | 'outcomePoints' | 'exactScorePoints' | 'firstScorerPoints' | 'bonusPoints'
+>
 
 function resultSign(home: number, away: number) {
   if (home > away) {
@@ -79,6 +99,10 @@ export function currentPredictionStageId(
   }
 
   return orderedStages.find((stage) => now.getTime() < stage.endsAt.getTime())?.id ?? orderedStages[orderedStages.length - 1]!.id
+}
+
+export function shouldUseGeneralRankingTieBreakers(stage: Pick<TournamentStage, 'code'> | null | undefined) {
+  return Boolean(stage && generalTieBreakerStageCodes.includes(stage.code))
 }
 
 export function isStagePredictionOpen(
@@ -233,35 +257,33 @@ export function aggregateRanking(
   breakdowns: readonly ScoreBreakdown[],
   members: readonly { userId: string; displayName: string }[],
   stageId?: string,
+  options: AggregateRankingOptions = {},
 ) {
   const sortedRows = members
     .map((member) => {
       const userBreakdowns = breakdowns.filter((row) => row.userId === member.userId)
       const stageBreakdowns = stageId ? userBreakdowns.filter((row) => row.stageId === stageId) : userBreakdowns
       const visibleBreakdowns = stageId ? stageBreakdowns : userBreakdowns
-      const visibleMatchBreakdowns = visibleBreakdowns.filter((row) => row.sourceType === 'match')
-      const visibleBonusBreakdowns = visibleBreakdowns.filter((row) => row.sourceType === 'bonus')
-      const visibleTotalPoints = visibleBreakdowns.reduce((sum, row) => sum + row.totalPoints, 0)
+      const visibleStats = aggregateRankingStats(visibleBreakdowns)
+      const tieBreakerStats =
+        stageId && options.useGeneralTieBreakers
+          ? aggregateRankingStats(userBreakdowns)
+          : visibleStats
 
       return {
         userId: member.userId,
         displayName: member.displayName,
-        totalPoints: visibleTotalPoints,
-        outcomePoints: visibleBreakdowns.reduce((sum, row) => sum + row.outcomePoints, 0),
-        exactScorePoints: visibleBreakdowns.reduce((sum, row) => sum + row.exactScorePoints, 0),
-        firstScorerPoints: visibleMatchBreakdowns.reduce(
-          (sum, row) => sum + row.firstScorerPoints + row.bonusPoints,
-          0,
-        ),
-        bonusPoints: visibleBonusBreakdowns.reduce((sum, row) => sum + row.bonusPoints, 0),
+        ...visibleStats,
+        tieBreakerStats,
       }
     })
     .sort(
       (a, b) =>
         b.totalPoints - a.totalPoints ||
-        b.exactScorePoints - a.exactScorePoints ||
-        b.outcomePoints - a.outcomePoints ||
-        b.firstScorerPoints - a.firstScorerPoints ||
+        b.tieBreakerStats.totalPoints - a.tieBreakerStats.totalPoints ||
+        b.tieBreakerStats.exactScorePoints - a.tieBreakerStats.exactScorePoints ||
+        b.tieBreakerStats.outcomePoints - a.tieBreakerStats.outcomePoints ||
+        b.tieBreakerStats.firstScorerPoints - a.tieBreakerStats.firstScorerPoints ||
         a.displayName.localeCompare(b.displayName, 'pl'),
     )
 
@@ -277,8 +299,30 @@ export function aggregateRanking(
     previousPosition = position
 
     return {
-      ...row,
+      userId: row.userId,
+      displayName: row.displayName,
+      totalPoints: row.totalPoints,
+      outcomePoints: row.outcomePoints,
+      exactScorePoints: row.exactScorePoints,
+      firstScorerPoints: row.firstScorerPoints,
+      bonusPoints: row.bonusPoints,
       position,
     }
   })
+}
+
+function aggregateRankingStats(breakdowns: readonly ScoreBreakdown[]): RankingStats {
+  const matchBreakdowns = breakdowns.filter((row) => row.sourceType === 'match')
+  const bonusBreakdowns = breakdowns.filter((row) => row.sourceType === 'bonus')
+
+  return {
+    totalPoints: breakdowns.reduce((sum, row) => sum + row.totalPoints, 0),
+    outcomePoints: breakdowns.reduce((sum, row) => sum + row.outcomePoints, 0),
+    exactScorePoints: breakdowns.reduce((sum, row) => sum + row.exactScorePoints, 0),
+    firstScorerPoints: matchBreakdowns.reduce(
+      (sum, row) => sum + row.firstScorerPoints + row.bonusPoints,
+      0,
+    ),
+    bonusPoints: bonusBreakdowns.reduce((sum, row) => sum + row.bonusPoints, 0),
+  }
 }

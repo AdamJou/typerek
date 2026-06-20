@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MatchPrediction } from '~/types/domain'
 import { formatPlayerDisplayName } from '~/utils/footballUi'
-import { aggregateRanking, canRevealMatchPredictions, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen } from '~/utils/scoring'
+import { aggregateRanking, canRevealMatchPredictions, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen, shouldUseGeneralRankingTieBreakers } from '~/utils/scoring'
 
 const route = useRoute()
 const {
@@ -78,7 +78,11 @@ const stagePositionByUserId = computed(() => {
     return new Map<string, number>()
   }
 
-  return new Map(aggregateRanking(rankingBreakdowns.value, members, match.value.stageId).map((row) => [row.userId, row.position]))
+  return new Map(
+    aggregateRanking(rankingBreakdowns.value, members, match.value.stageId, {
+      useGeneralTieBreakers: shouldUseGeneralRankingTieBreakers(stage.value),
+    }).map((row) => [row.userId, row.position]),
+  )
 })
 const predictionSummaryRows = computed(() => {
   if (!canRevealCurrentMatchPredictions.value) {

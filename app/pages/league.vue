@@ -5,7 +5,7 @@ import { isMatchToday } from '~/utils/footballUi'
 import { filledBonusCount, isBonusAnswerFilled, isBonusLocked, resolveBonusGlobalLockAt, resolveBonusQuestion } from '~/utils/bonus'
 import { defaultScoringRules, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen } from '~/utils/scoring'
 
-const { bonusPredictions, bonusQuestions, currentUserId, errorMessage, hasLeague, hasLoaded, isLoading, league, matchEvents, matches, members, players, predictionPresence, predictions, ranking, stages, teams, tournament } =
+const { bonusPredictions, bonusQuestions, currentStageRanking, currentUserId, errorMessage, hasLeague, hasLoaded, isLoading, league, matchEvents, matches, members, players, predictionPresence, predictions, stages, teams, tournament } =
   useTyperekData()
 const { getMatchTeams, getPlayer } = useTeamLookup(teams, players)
 const { predictionMembersFor } = usePredictionParticipants(members, predictionPresence, predictions)
@@ -287,8 +287,8 @@ function bonusCardMessage() {
         <div class="summary-tile-icon" aria-hidden="true">
           <Medal :size="22" />
         </div>
-        <strong>{{ ranking[0]?.displayName ?? '-' }}</strong>
-        <span>lider</span>
+        <strong>{{ currentStageRanking[0]?.displayName ?? '-' }}</strong>
+        <span>lider etapu</span>
       </article>
       <NuxtLink
         v-if="hasLeague"
@@ -399,7 +399,7 @@ function bonusCardMessage() {
              <ChevronRight :size="16" aria-hidden="true" />
         </NuxtLink>
       </div>
-      <RankingPodium :rows="ranking" />
+      <RankingPodium :rows="currentStageRanking" />
     </section>
 
     <ResultsPreview

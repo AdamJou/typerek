@@ -24,7 +24,7 @@ import type {
   UpsertBonusPredictionPayload,
   UpsertMatchPredictionPayload,
 } from '~/repositories/TyperekRepository'
-import { aggregateRanking, currentPredictionStageId, resolveRankingBreakdowns } from '~/utils/scoring'
+import { aggregateRanking, currentPredictionStageId, resolveRankingBreakdowns, shouldUseGeneralRankingTieBreakers } from '~/utils/scoring'
 
 const tournament = reactive<Tournament>(emptyTournament())
 const league = reactive<League>(emptyLeague())
@@ -58,7 +58,11 @@ export function useTyperekData() {
 
     return stages.find((stage) => stage.id === activeStageId) ?? stages[0] ?? null
   })
-  const currentStageRanking = computed(() => aggregateRanking(rankingBreakdowns.value, members, currentStage.value?.id))
+  const currentStageRanking = computed(() =>
+    aggregateRanking(rankingBreakdowns.value, members, currentStage.value?.id, {
+      useGeneralTieBreakers: shouldUseGeneralRankingTieBreakers(currentStage.value),
+    }),
+  )
   const hasLeague = computed(() => Boolean(league.id))
 
   if (import.meta.client && !hasLoaded.value && !isLoading.value) {
