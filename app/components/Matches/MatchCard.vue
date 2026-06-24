@@ -22,6 +22,7 @@ const props = defineProps<{
   predictedMembers?: readonly LeagueMember[]
   predictionLabel?: string
   predictionPlaceholder?: string
+  actionLabelOverride?: string
 }>()
 
 const cardComponent = computed(() => (props.to ? resolveComponent('NuxtLink') : 'article'))
@@ -96,6 +97,10 @@ const awayFlag = computed(() => getTeamFlag(props.awayTeam))
 const groupLabel = computed(() => (props.match.groupCode ? `Grupa ${props.match.groupCode}` : props.stage.shortName))
 const roundLabel = computed(() => props.match.roundName ?? props.stage.name)
 const actionLabel = computed(() => {
+  if (props.actionLabelOverride) {
+    return props.actionLabelOverride
+  }
+
   if (props.prediction) {
     return 'Zobacz typ'
   }

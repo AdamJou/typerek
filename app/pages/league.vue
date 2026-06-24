@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { BarChart3, CalendarClock, CalendarDays, CircleAlert, Clock3, Medal, TicketCheck, Users, ChevronRight } from 'lucide-vue-next'
 import type { Match } from '~/types/domain'
-import { isMatchToday } from '~/utils/footballUi'
+import { isMatchToday, isUpcomingMatchToday, isUpcomingMatchWithinHours } from '~/utils/footballUi'
 import { filledBonusCount, isBonusAnswerFilled, isBonusLocked, resolveBonusGlobalLockAt, resolveBonusQuestion } from '~/utils/bonus'
 import { defaultScoringRules, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen } from '~/utils/scoring'
 
@@ -10,7 +10,8 @@ const { bonusPredictions, bonusQuestions, currentStageRanking, currentUserId, er
 const { getMatchTeams, getPlayer } = useTeamLookup(teams, players)
 const { predictionMembersFor } = usePredictionParticipants(members, predictionPresence, predictions)
 const currentMember = computed(() => members.find((member) => member.userId === currentUserId.value))
-const { currentStagePendingCount } = usePendingPredictions()
+const { saveLeagueMatchReturnState } = useLeagueMatchReturnState(hasLoaded)
+const { showUpcomingTodayOnly } = useUpcomingMatchesPreferences()
 const now = shallowRef(new Date())
 
 const scoringItems = [
@@ -22,9 +23,13 @@ const scoringItems = [
 
 const nextMatches = computed(() =>
   [...matches]
-    .filter((match) => match.status === 'scheduled')
+    .filter((match) => (showUpcomingTodayOnly.value ? isUpcomingMatchToday(match, now.value) : isUpcomingMatchWithinHours(match, 24, now.value)))
     .sort((a, b) => new Date(a.startsAtUtc).getTime() - new Date(b.startsAtUtc).getTime())
-    .slice(0, 2),
+)
+const nextMatchesPendingCount = computed(() => nextMatches.value.filter((match) => needsPrediction(match)).length)
+const nextMatchesWindowLabel = computed(() => (showUpcomingTodayOnly.value ? 'dziś' : '24h'))
+const nextMatchesEmptyMessage = computed(() =>
+  showUpcomingTodayOnly.value ? 'Brak nierozpoczętych meczów na dziś.' : 'Brak nierozpoczętych meczów w ciągu 24 godzin.',
 )
 
 const playedMatchesCount = computed(
@@ -197,6 +202,18 @@ function lockedLabel(match: Match) {
   return null
 }
 
+function actionLabelFor(match: Match) {
+  if (!ownPredictionFor(match.id)) {
+    return undefined
+  }
+
+  return isMatchPredictionOpen(match, stages, matches) ? 'Zmień typ' : 'Zobacz typ'
+}
+
+function saveReturnPoint(matchId: string) {
+  saveLeagueMatchReturnState(matchId)
+}
+
 function bonusCardMessage() {
   if (bonusTotalCount.value === 0) {
     return 'Pytania bonusowe nie zostały jeszcze dodane do ligi.'
@@ -360,19 +377,29 @@ function bonusCardMessage() {
       <div class="section-heading">
         <div class="section-heading-title">
           <h2>Najbliższe mecze</h2>
-          <span v-if="currentStagePendingCount > 0" class="pending-matches-badge">
-            {{ currentStagePendingCount }} nieotypowanych
+          <span class="pending-matches-time">{{ nextMatchesWindowLabel }}</span>
+          <span v-if="nextMatchesPendingCount > 0" class="pending-matches-badge">
+            {{ nextMatchesPendingCount }} nieotypowanych
           </span>
         </div>
-        <NuxtLink to="/matches" class="cta-button">Wszystkie
-        <ChevronRight :size="16" aria-hidden="true" />
-        </NuxtLink>
+        <div class="section-heading-actions">
+          <label class="dashboard-filter" :class="{ 'is-active': showUpcomingTodayOnly }">
+            <input v-model="showUpcomingTodayOnly" type="checkbox">
+            <span>Tylko dzisiaj</span>
+          </label>
+          <NuxtLink to="/matches" class="cta-button">Wszystkie
+            <ChevronRight :size="16" aria-hidden="true" />
+          </NuxtLink>
+        </div>
       </div>
 
-      <div class="match-list">
+      <p v-if="nextMatches.length === 0" class="state-panel panel">{{ nextMatchesEmptyMessage }}</p>
+
+      <div v-else class="match-list">
         <MatchCard
           v-for="match in nextMatches"
           :key="match.id"
+          :data-match-id="match.id"
           :match="match"
           :match-events="matchEventsFor(match.id)"
           :home-team="getMatchTeams(match).homeTeam"
@@ -388,6 +415,8 @@ function bonusCardMessage() {
           :pending="needsPrediction(match)"
           :locked-label="lockedLabel(match)"
           :predicted-members="predictionMembersFor(match.id)"
+          :action-label-override="actionLabelFor(match)"
+          @click.capture="saveReturnPoint(match.id)"
         />
       </div>
     </section>
@@ -830,8 +859,29 @@ function bonusCardMessage() {
   gap: 8px;
 }
 
+.section-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .section-heading h2 {
   font-size: 22px;
+}
+
+.pending-matches-time {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  border-radius: 999px;
+  background: white;
+  padding: 2px 9px;
+  color: var(--app-primary);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
 }
 
 .pending-matches-badge {
@@ -845,6 +895,34 @@ function bonusCardMessage() {
   font-size: 11px;
   font-weight: 900;
   text-transform: uppercase;
+}
+
+.dashboard-filter {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(20, 33, 27, 0.14);
+  border-radius: 7px;
+  background: white;
+  padding: 0 11px;
+  color: var(--app-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.dashboard-filter input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--app-primary);
+}
+
+.dashboard-filter.is-active {
+  border-color: var(--app-primary);
+  background: #edf7f2;
+  color: var(--app-primary);
 }
 
 .section-heading a {
@@ -902,6 +980,21 @@ function bonusCardMessage() {
 }
 
 @media (max-width: 640px) {
+  .section-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .section-heading-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dashboard-filter {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
   .league-hero-topline,
   .hero-rules-heading {
     align-items: start;

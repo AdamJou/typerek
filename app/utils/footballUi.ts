@@ -329,6 +329,45 @@ export function isMatchToday(match: Pick<Match, 'startsAtUtc' | 'status'>, now =
   return kickoff.toDateString() === now.toDateString()
 }
 
+export function isUpcomingMatch(match: Pick<Match, 'startsAtUtc' | 'status'>, now = new Date()) {
+  if (match.status !== 'scheduled') {
+    return false
+  }
+
+  const kickoff = new Date(match.startsAtUtc)
+
+  if (kickoff.getTime() < now.getTime()) {
+    return false
+  }
+
+  const endOfTomorrow = new Date(now)
+  endOfTomorrow.setDate(endOfTomorrow.getDate() + 1)
+  endOfTomorrow.setHours(23, 59, 59, 999)
+
+  return kickoff.getTime() <= endOfTomorrow.getTime()
+}
+
+export function isUpcomingMatchWithinHours(match: Pick<Match, 'startsAtUtc' | 'status'>, hours: number, now = new Date()) {
+  if (match.status !== 'scheduled' || hours <= 0) {
+    return false
+  }
+
+  const kickoffTime = new Date(match.startsAtUtc).getTime()
+  const nowTime = now.getTime()
+
+  return kickoffTime >= nowTime && kickoffTime <= nowTime + hours * 60 * 60 * 1000
+}
+
+export function isUpcomingMatchToday(match: Pick<Match, 'startsAtUtc' | 'status'>, now = new Date()) {
+  if (match.status !== 'scheduled') {
+    return false
+  }
+
+  const kickoff = new Date(match.startsAtUtc)
+
+  return kickoff.getTime() >= now.getTime() && kickoff.toDateString() === now.toDateString()
+}
+
 export function predictionScoreLabel(prediction: MatchPrediction) {
   return `${prediction.predictedHomeScore}:${prediction.predictedAwayScore}`
 }

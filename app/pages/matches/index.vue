@@ -2,10 +2,11 @@
 import { Save } from 'lucide-vue-next'
 import type { Match, TournamentStage } from '~/types/domain'
 import type { BulkPredictionDraft } from '~/components/Predictions/BulkPredictionEditor.vue'
-import { compareMatchesChronologically, isMatchToday } from '~/utils/footballUi'
+import type { MatchesListMode } from '~/composables/useMatchesListState'
+import { compareMatchesChronologically, isMatchToday, isUpcomingMatch } from '~/utils/footballUi'
 import { currentPredictionStageId, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen } from '~/utils/scoring'
 
-type MatchViewMode = 'pending' | 'all' | 'bulk'
+type MatchViewMode = MatchesListMode
 
 const { currentUserId, errorMessage, hasLeague, hasLoaded, isLoading, league, matchEvents, matches, members, players, predictionPresence, predictions, stages, teams, upsertPrediction } =
   useTyperekData()
@@ -13,8 +14,11 @@ const { getMatchTeams, getPlayer, getPlayersForMatch } = useTeamLookup(teams, pl
 const { predictionMembersFor } = usePredictionParticipants(members, predictionPresence, predictions)
 const currentMember = computed(() => members.find((member) => member.userId === currentUserId.value))
 
-const activeMode = shallowRef<MatchViewMode>('pending')
+const activeMode = shallowRef<MatchViewMode>('upcoming')
 const activeStageId = shallowRef('')
+const { saveMatchesListState } = useMatchesListState(activeMode, activeStageId, hasLoaded)
+const showUpcomingPending = shallowRef(true)
+const showUpcomingPredicted = shallowRef(true)
 const bulkDrafts = reactive<Record<string, BulkPredictionDraft>>({})
 const bulkValidationMessages = reactive<Record<string, string | null>>({})
 const bulkSavedMessage = shallowRef('')
@@ -30,6 +34,33 @@ const stageTabs = computed(() => {
   return stages.filter((stage) => stage.id === currentStageId.value)
 })
 const sortedMatches = computed(() => [...matches].sort(compareMatchesChronologically))
+const upcomingMatches = computed(() => sortedMatches.value.filter((match) => isUpcomingMatch(match)))
+const upcomingPendingMatches = computed(() => upcomingMatches.value.filter((match) => needsPrediction(match)))
+const upcomingPredictedMatches = computed(() => upcomingMatches.value.filter((match) => ownPredictionFor(match.id)))
+const upcomingUnavailableMatches = computed(() =>
+  upcomingMatches.value.filter((match) => !needsPrediction(match) && !ownPredictionFor(match.id)),
+)
+const upcomingSections = computed(() =>
+  [
+    { id: 'pending', label: 'Do otypowania', countLabel: `${upcomingPendingMatches.value.length} do typu`, matches: upcomingPendingMatches.value },
+    { id: 'predicted', label: 'Otypowane', countLabel: `${upcomingPredictedMatches.value.length} otypowane`, matches: upcomingPredictedMatches.value },
+    { id: 'unavailable', label: 'Niedostępne', countLabel: `${upcomingUnavailableMatches.value.length} poza typowaniem`, matches: upcomingUnavailableMatches.value },
+  ].filter((section) => section.id !== 'unavailable' || section.matches.length > 0),
+)
+const hasUpcomingStatusFilter = computed(() => showUpcomingPending.value || showUpcomingPredicted.value)
+const visibleUpcomingSections = computed(() =>
+  upcomingSections.value.filter((section) => {
+    if (section.id === 'pending') {
+      return showUpcomingPending.value
+    }
+
+    if (section.id === 'predicted') {
+      return showUpcomingPredicted.value
+    }
+
+    return showUpcomingPending.value && showUpcomingPredicted.value
+  }),
+)
 const pendingMatches = computed(() => sortedMatches.value.filter((match) => needsPrediction(match)))
 const bulkMatches = computed(() =>
   sortedMatches.value.filter((match) => match.stageId === currentStageId.value && needsPrediction(match)),
@@ -49,6 +80,7 @@ const matchGroups = computed(() =>
     .filter((group) => group.matches.length > 0),
 )
 const modeTabs = computed(() => [
+  { id: 'upcoming' as const, label: 'Najbliższe', count: upcomingMatches.value.length },
   { id: 'pending' as const, label: 'Do typowania', count: pendingMatches.value.length },
   { id: 'all' as const, label: 'Wszystkie', count: matches.length },
   { id: 'bulk' as const, label: 'Typuj całą kolejkę', count: bulkMatches.value.length },
@@ -101,6 +133,8 @@ function selectMode(mode: MatchViewMode) {
 
   if (mode === 'pending' || mode === 'bulk') {
     activeStageId.value = currentStageId.value
+  } else if (mode === 'upcoming') {
+    activeStageId.value ||= currentStageId.value
   } else if (!activeStageId.value) {
     activeStageId.value = currentStageId.value
   }
@@ -132,6 +166,18 @@ function lockedLabel(match: Match) {
   }
 
   return null
+}
+
+function actionLabelFor(match: Match) {
+  if (!ownPredictionFor(match.id)) {
+    return undefined
+  }
+
+  return isMatchPredictionOpen(match, stages, matches) ? 'Zmień typ' : 'Zobacz typ'
+}
+
+function saveReturnPoint(matchId: string) {
+  saveMatchesListState(matchId)
 }
 
 function defaultBulkDraft(): BulkPredictionDraft {
@@ -220,7 +266,9 @@ watch(
       return
     }
 
-    if (!activeStageId.value || ((activeMode.value === 'pending' || activeMode.value === 'bulk') && activeStageId.value !== stageId)) {
+    if (!activeStageId.value && activeMode.value !== 'all') {
+      activeStageId.value = stageId
+    } else if ((activeMode.value === 'pending' || activeMode.value === 'bulk') && activeStageId.value !== stageId) {
       activeStageId.value = stageId
     }
   },
@@ -259,13 +307,88 @@ watch(
       </div>
 
       <StageTabs
-        v-if="stageTabs.length && activeMode !== 'bulk'"
+        v-if="stageTabs.length && (activeMode === 'pending' || activeMode === 'all')"
         :stages="stageTabs"
         :active-stage-id="activeStageId"
         :all-label="activeMode === 'all' ? 'Wszystkie rundy' : undefined"
         @select="activeStageId = $event"
       />
     </div>
+
+    <section v-if="hasLoaded && activeMode === 'upcoming'" class="upcoming-mode">
+      <div class="upcoming-summary panel">
+        <div>
+          <span>Najbliższe mecze</span>
+          <h2>Dzisiaj i jutro</h2>
+          <p>Nierozpoczęte mecze z najbliższego okna, rozdzielone według Twoich typów.</p>
+        </div>
+        <div class="upcoming-summary-counts" aria-label="Podsumowanie najbliższych meczów">
+          <strong>{{ upcomingPendingMatches.length }} do typu</strong>
+          <span>{{ upcomingPredictedMatches.length }} otypowane</span>
+        </div>
+      </div>
+
+      <div v-if="upcomingMatches.length > 0" class="upcoming-filters panel" aria-label="Filtry najbliższych meczów">
+        <span>Pokazuj</span>
+        <label class="upcoming-filter" :class="{ 'is-active': showUpcomingPending }">
+          <input v-model="showUpcomingPending" type="checkbox">
+          <span>Do otypowania</span>
+          <strong>{{ upcomingPendingMatches.length }}</strong>
+        </label>
+        <label class="upcoming-filter" :class="{ 'is-active': showUpcomingPredicted }">
+          <input v-model="showUpcomingPredicted" type="checkbox">
+          <span>Otypowane</span>
+          <strong>{{ upcomingPredictedMatches.length }}</strong>
+        </label>
+      </div>
+
+      <p v-if="upcomingMatches.length === 0" class="state-panel panel">Brak nierozpoczętych meczów na dziś i jutro.</p>
+
+      <p v-else-if="!hasUpcomingStatusFilter" class="state-panel panel">Wybierz co najmniej jeden filtr najbliższych meczów.</p>
+
+      <div v-else class="upcoming-sections">
+        <section v-for="section in visibleUpcomingSections" :key="section.id" class="upcoming-section">
+          <div class="match-group-heading">
+            <div>
+              <span>Najbliższe</span>
+              <h2>{{ section.label }}</h2>
+            </div>
+            <div class="match-group-counts">
+              <strong>{{ section.countLabel }}</strong>
+            </div>
+          </div>
+
+          <p v-if="section.matches.length === 0" class="state-panel panel">
+            {{ section.id === 'pending' ? 'Nie masz meczów do otypowania w tym oknie.' : 'Nie masz jeszcze otypowanych meczów w tym oknie.' }}
+          </p>
+
+          <div v-else class="match-list">
+            <MatchCard
+              v-for="match in section.matches"
+              :key="match.id"
+              :data-match-id="match.id"
+              :match="match"
+              :match-events="matchEventsFor(match.id)"
+              :home-team="getMatchTeams(match).homeTeam"
+              :away-team="getMatchTeams(match).awayTeam"
+              :stage="stageFor(match.stageId)!"
+              :to="`/matches/${match.id}`"
+              :prediction="ownPredictionFor(match.id)"
+              :match-predictions="predictionsFor(match.id)"
+              :current-member="currentMember"
+              :players="players"
+              :first-scorer="getPlayer(ownPredictionFor(match.id)?.firstScorerPlayerId ?? null)"
+              :attention="needsAttention(match)"
+              :pending="needsPrediction(match)"
+              :locked-label="lockedLabel(match)"
+              :predicted-members="predictionMembersFor(match.id)"
+              :action-label-override="actionLabelFor(match)"
+              @click.capture="saveReturnPoint(match.id)"
+            />
+          </div>
+        </section>
+      </div>
+    </section>
 
     <section v-if="hasLoaded && activeMode === 'bulk'" class="bulk-mode">
       <div class="bulk-hero panel">
@@ -299,10 +422,11 @@ watch(
           />
 
           <BulkPredictionEditor
-            v-model:draft="bulkDrafts[match.id]"
+            :draft="bulkDrafts[match.id] ?? defaultBulkDraft()"
             :match="match"
             :players="getPlayersForMatch(match)"
             :teams="predictionTeamsFor(match)"
+            @update:draft="bulkDrafts[match.id] = $event"
             @validity="setBulkValidation(match.id, $event)"
           />
         </article>
@@ -320,7 +444,7 @@ watch(
       </div>
     </section>
 
-    <p v-if="hasLoaded && activeMode !== 'bulk' && visibleMatches.length === 0" class="state-panel panel">
+    <p v-if="hasLoaded && activeMode !== 'bulk' && activeMode !== 'upcoming' && visibleMatches.length === 0" class="state-panel panel">
       {{
         activeMode === 'pending'
           ? 'Nie masz teraz meczów do typowania w aktywnej kolejce.'
@@ -328,7 +452,7 @@ watch(
       }}
     </p>
 
-    <div v-else-if="hasLoaded && activeMode !== 'bulk'" class="match-groups">
+    <div v-else-if="hasLoaded && activeMode !== 'bulk' && activeMode !== 'upcoming'" class="match-groups">
       <section v-for="group in matchGroups" :key="group.stage.id" class="match-group">
         <div class="match-group-heading">
           <div>
@@ -346,6 +470,7 @@ watch(
           <MatchCard
             v-for="match in group.matches"
             :key="match.id"
+            :data-match-id="match.id"
             :match="match"
             :match-events="matchEventsFor(match.id)"
             :home-team="getMatchTeams(match).homeTeam"
@@ -361,6 +486,8 @@ watch(
             :pending="needsPrediction(match)"
             :locked-label="lockedLabel(match)"
             :predicted-members="predictionMembersFor(match.id)"
+            :action-label-override="actionLabelFor(match)"
+            @click.capture="saveReturnPoint(match.id)"
           />
         </div>
       </section>
@@ -372,6 +499,9 @@ watch(
 .matches-page,
 .page-heading,
 .match-toolbar,
+.upcoming-mode,
+.upcoming-sections,
+.upcoming-section,
 .bulk-mode,
 .bulk-match-list,
 .bulk-match-item,
@@ -384,6 +514,8 @@ watch(
 
 .page-heading h1,
 .page-heading p,
+.upcoming-summary h2,
+.upcoming-summary p,
 .match-group-heading h2 {
   margin: 0;
 }
@@ -406,6 +538,127 @@ watch(
   color: var(--app-muted);
   font-size: 14px;
   font-weight: 800;
+}
+
+.upcoming-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+}
+
+.upcoming-summary div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.upcoming-summary span:first-child {
+  color: var(--app-primary);
+  font-size: 11px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.upcoming-summary h2 {
+  font-size: 24px;
+  line-height: 1.05;
+}
+
+.upcoming-summary p {
+  color: var(--app-muted);
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.upcoming-summary-counts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.upcoming-summary-counts span,
+.upcoming-summary-counts strong {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  border-radius: 7px;
+  padding: 0 10px;
+  background: #f3f6f1;
+  color: var(--app-primary-dark);
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.upcoming-summary-counts strong {
+  background: #fff2cf;
+  color: #765813;
+}
+
+.upcoming-section {
+  gap: 12px;
+}
+
+.upcoming-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+}
+
+.upcoming-filters > span {
+  color: var(--app-muted);
+  font-size: 12px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.upcoming-filter {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--app-line);
+  border-radius: 7px;
+  background: white;
+  padding: 0 10px;
+  color: var(--app-muted);
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.upcoming-filter input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--app-primary);
+}
+
+.upcoming-filter strong {
+  display: inline-flex;
+  min-width: 24px;
+  min-height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: #eef4ef;
+  color: var(--app-primary-dark);
+  font-size: 12px;
+}
+
+.upcoming-filter.is-active {
+  border-color: rgba(12, 107, 70, 0.4);
+  background: #edf5ef;
+  color: var(--app-primary-dark);
 }
 
 .bulk-hero,
@@ -513,7 +766,7 @@ watch(
 
 .mode-tab {
   display: flex;
-  min-width: 0;
+  min-width: max-content;
   min-height: 44px;
   align-items: center;
   justify-content: space-between;
@@ -611,7 +864,8 @@ watch(
   }
 
   .mode-tabs {
-    width: min(440px, 100%);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: min(720px, 100%);
   }
 
   .match-list {
@@ -621,6 +875,7 @@ watch(
 
 @media (max-width: 560px) {
   .bulk-hero,
+  .upcoming-summary,
   .bulk-submit-bar,
   .match-group-heading {
     display: grid;
@@ -634,6 +889,11 @@ watch(
 
   .match-group-counts {
     justify-content: flex-start;
+  }
+
+  .upcoming-summary-counts {
+    justify-content: flex-start;
+    min-width: 0;
   }
 }
 </style>

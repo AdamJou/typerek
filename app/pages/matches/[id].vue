@@ -4,6 +4,7 @@ import { formatPlayerDisplayName } from '~/utils/footballUi'
 import { aggregateRanking, canRevealMatchPredictions, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen, shouldUseGeneralRankingTieBreakers } from '~/utils/scoring'
 
 const route = useRoute()
+const detailBackLink = useMatchDetailReturnLink()
 const {
   currentUserId,
   deletePrediction,
@@ -286,19 +287,19 @@ onBeforeUnmount(() => {
 
 <template>
   <section v-if="isLoading && !hasLoaded" class="missing panel">
-    <BackLink to="/league" label="Wróć do ligi" />
+    <BackLink :to="detailBackLink.to" :label="detailBackLink.label" />
     <h1>Pobieram mecz...</h1>
   </section>
 
   <section v-else-if="errorMessage" class="missing panel">
-    <BackLink to="/league" label="Wróć do ligi" />
+    <BackLink :to="detailBackLink.to" :label="detailBackLink.label" />
     <h1>Nie udało się pobrać danych</h1>
     <p>{{ errorMessage }}</p>
-    <NuxtLink class="button-secondary" to="/matches">Wróć do listy</NuxtLink>
+    <NuxtLink class="button-secondary" :to="detailBackLink.to">{{ detailBackLink.label }}</NuxtLink>
   </section>
 
   <section v-else-if="match && stage" class="match-detail">
-    <BackLink to="/league" label="Wróć do ligi" />
+    <BackLink :to="detailBackLink.to" :label="detailBackLink.label" />
 
     <MatchCard
       v-if="!isEditing"
@@ -351,9 +352,9 @@ onBeforeUnmount(() => {
   </section>
 
   <section v-else class="missing panel">
-    <BackLink to="/league" label="Wróć do ligi" />
+    <BackLink :to="detailBackLink.to" :label="detailBackLink.label" />
     <h1>Nie znaleziono meczu</h1>
-    <NuxtLink class="button-secondary" to="/matches">Wróć do listy</NuxtLink>
+    <NuxtLink class="button-secondary" :to="detailBackLink.to">{{ detailBackLink.label }}</NuxtLink>
   </section>
 </template>
 
