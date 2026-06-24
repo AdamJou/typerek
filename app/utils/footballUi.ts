@@ -329,8 +329,22 @@ export function isMatchToday(match: Pick<Match, 'startsAtUtc' | 'status'>, now =
   return kickoff.toDateString() === now.toDateString()
 }
 
-export function isUpcomingMatch(match: Pick<Match, 'startsAtUtc' | 'status'>, now = new Date()) {
-  if (match.status !== 'scheduled') {
+type UpcomingMatchInput = Pick<Match, 'startsAtUtc' | 'status'> & Partial<Pick<Match, 'resultConfirmedAt'>>
+
+function isUnsettledStartedMatch(match: UpcomingMatchInput, now: Date) {
+  if (match.status === 'postponed' || match.status === 'confirmed' || Boolean(match.resultConfirmedAt)) {
+    return false
+  }
+
+  return new Date(match.startsAtUtc).getTime() <= now.getTime()
+}
+
+export function isUpcomingMatch(match: UpcomingMatchInput, now = new Date()) {
+  if (isUnsettledStartedMatch(match, now)) {
+    return true
+  }
+
+  if (match.status !== 'scheduled' || Boolean(match.resultConfirmedAt)) {
     return false
   }
 
@@ -347,8 +361,12 @@ export function isUpcomingMatch(match: Pick<Match, 'startsAtUtc' | 'status'>, no
   return kickoff.getTime() <= endOfTomorrow.getTime()
 }
 
-export function isUpcomingMatchWithinHours(match: Pick<Match, 'startsAtUtc' | 'status'>, hours: number, now = new Date()) {
-  if (match.status !== 'scheduled' || hours <= 0) {
+export function isUpcomingMatchWithinHours(match: UpcomingMatchInput, hours: number, now = new Date()) {
+  if (isUnsettledStartedMatch(match, now)) {
+    return true
+  }
+
+  if (match.status !== 'scheduled' || Boolean(match.resultConfirmedAt) || hours <= 0) {
     return false
   }
 
@@ -358,8 +376,12 @@ export function isUpcomingMatchWithinHours(match: Pick<Match, 'startsAtUtc' | 's
   return kickoffTime >= nowTime && kickoffTime <= nowTime + hours * 60 * 60 * 1000
 }
 
-export function isUpcomingMatchToday(match: Pick<Match, 'startsAtUtc' | 'status'>, now = new Date()) {
-  if (match.status !== 'scheduled') {
+export function isUpcomingMatchToday(match: UpcomingMatchInput, now = new Date()) {
+  if (isUnsettledStartedMatch(match, now)) {
+    return true
+  }
+
+  if (match.status !== 'scheduled' || Boolean(match.resultConfirmedAt)) {
     return false
   }
 

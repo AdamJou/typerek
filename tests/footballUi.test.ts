@@ -50,7 +50,7 @@ describe('isUpcomingMatch', () => {
     ).toBe(true)
   })
 
-  it('excludes already started matches and matches after tomorrow', () => {
+  it('keeps already started unsettled matches visible until they are confirmed', () => {
     expect(
       isUpcomingMatch(
         {
@@ -59,7 +59,47 @@ describe('isUpcomingMatch', () => {
         },
         now,
       ),
+    ).toBe(true)
+    expect(
+      isUpcomingMatch(
+        {
+          startsAtUtc: kickoffAt(new Date(2026, 5, 24, 19, 59, 59, 999)),
+          status: 'live',
+        },
+        now,
+      ),
+    ).toBe(true)
+    expect(
+      isUpcomingMatch(
+        {
+          startsAtUtc: kickoffAt(new Date(2026, 5, 24, 18, 0, 0)),
+          status: 'finished',
+        },
+        now,
+      ),
+    ).toBe(true)
+    expect(
+      isUpcomingMatch(
+        {
+          startsAtUtc: kickoffAt(new Date(2026, 5, 24, 18, 0, 0)),
+          status: 'confirmed',
+        },
+        now,
+      ),
     ).toBe(false)
+    expect(
+      isUpcomingMatch(
+        {
+          startsAtUtc: kickoffAt(new Date(2026, 5, 24, 18, 0, 0)),
+          status: 'finished',
+          resultConfirmedAt: kickoffAt(new Date(2026, 5, 24, 20, 10, 0)),
+        },
+        now,
+      ),
+    ).toBe(false)
+  })
+
+  it('excludes matches after tomorrow and future non-scheduled matches', () => {
     expect(
       isUpcomingMatch(
         {
@@ -69,9 +109,6 @@ describe('isUpcomingMatch', () => {
         now,
       ),
     ).toBe(false)
-  })
-
-  it('excludes non-scheduled matches', () => {
     expect(
       isUpcomingMatch(
         {
@@ -122,6 +159,30 @@ describe('isUpcomingMatchWithinHours', () => {
       ),
     ).toBe(false)
   })
+
+  it('keeps already started unsettled matches visible outside the hour threshold', () => {
+    expect(
+      isUpcomingMatchWithinHours(
+        {
+          startsAtUtc: '2026-06-24T16:00:00.000Z',
+          status: 'live',
+        },
+        24,
+        now,
+      ),
+    ).toBe(true)
+    expect(
+      isUpcomingMatchWithinHours(
+        {
+          startsAtUtc: '2026-06-24T16:00:00.000Z',
+          status: 'finished',
+          resultConfirmedAt: '2026-06-24T18:10:00.000Z',
+        },
+        24,
+        now,
+      ),
+    ).toBe(false)
+  })
 })
 
 describe('isUpcomingMatchToday', () => {
@@ -131,7 +192,7 @@ describe('isUpcomingMatchToday', () => {
     return date.toISOString()
   }
 
-  it('includes only scheduled matches later today', () => {
+  it('includes scheduled matches later today and already started unsettled matches', () => {
     expect(
       isUpcomingMatchToday(
         {
@@ -146,11 +207,21 @@ describe('isUpcomingMatchToday', () => {
       isUpcomingMatchToday(
         {
           startsAtUtc: kickoffAt(new Date(2026, 5, 24, 19, 59, 59, 999)),
-          status: 'scheduled',
+          status: 'live',
         },
         now,
       ),
-    ).toBe(false)
+    ).toBe(true)
+
+    expect(
+      isUpcomingMatchToday(
+        {
+          startsAtUtc: kickoffAt(new Date(2026, 5, 23, 23, 30, 0)),
+          status: 'finished',
+        },
+        now,
+      ),
+    ).toBe(true)
 
     expect(
       isUpcomingMatchToday(
