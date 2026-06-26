@@ -182,22 +182,20 @@ export function scoreMatchPrediction(
     effectiveMatchEvents
       .filter((event) => event.eventType === 'goal' && !isOwnGoal(event) && event.playerId)
       .sort((left, right) => left.minute - right.minute || left.createdAt.localeCompare(right.createdAt))[0]?.playerId ?? match.firstScorerPlayerId
-  const firstScorerPoints =
-    (prediction.noScorer && wasGoalless) ||
-    (!prediction.noScorer &&
-      prediction.firstScorerPlayerId !== null &&
-      (normalGoalScorerIds.size > 0
-        ? normalGoalScorerIds.has(prediction.firstScorerPlayerId)
-        : prediction.firstScorerPlayerId === match.firstScorerPlayerId))
-      ? rules.firstScorerPoints
-      : 0
-  const bonusPoints =
+  const correctNoScorer = prediction.noScorer && wasGoalless
+  const correctScorer =
+    !prediction.noScorer &&
+    prediction.firstScorerPlayerId !== null &&
+    (normalGoalScorerIds.size > 0
+      ? normalGoalScorerIds.has(prediction.firstScorerPlayerId)
+      : prediction.firstScorerPlayerId === match.firstScorerPlayerId)
+  const correctFirstScorer =
     !prediction.noScorer &&
     prediction.firstScorerPlayerId !== null &&
     firstNormalScorerId !== null &&
     prediction.firstScorerPlayerId === firstNormalScorerId
-      ? rules.firstScorerBonusPoints
-      : 0
+  const firstScorerPoints = correctNoScorer || correctScorer ? rules.firstScorerPoints : 0
+  const bonusPoints = correctNoScorer || correctFirstScorer ? rules.firstScorerBonusPoints : 0
 
   return {
     leagueId: prediction.leagueId,

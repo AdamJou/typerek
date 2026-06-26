@@ -276,7 +276,6 @@ function buildMatchRow(match: Match): ResultMatchRow {
 function buildPlayerRow(member: LeagueMember, match: Match, goalEvents: readonly MatchEvent[]): ResultPlayerRow {
   const prediction = predictionFor(member.userId, match.id)
   const breakdown = breakdownFor(member.userId, match.id)
-  const firstNormalScorerId = firstNormalScorerIdFor(match, goalEvents)
 
   return {
     member,
@@ -285,13 +284,7 @@ function buildPlayerRow(member: LeagueMember, match: Match, goalEvents: readonly
     scoreState: prediction ? predictionResultState(match, prediction) : 'empty',
     scorerState: prediction ? predictionScorerState(match, prediction, goalEvents) : 'empty',
     scorerName: scorerNameParts(prediction),
-    scorerFirstBonus: Boolean(
-      prediction &&
-        !prediction.noScorer &&
-        prediction.firstScorerPlayerId &&
-        firstNormalScorerId &&
-        prediction.firstScorerPlayerId === firstNormalScorerId,
-    ),
+    scorerFirstBonus: prediction ? hasFirstScorerBonus(match, prediction, goalEvents) : false,
   }
 }
 
@@ -353,10 +346,8 @@ function predictionScorerState(match: Match, prediction: MatchPrediction, goalEv
     return 'empty'
   }
 
-  const wasGoalless = match.homeScore90 === 0 && match.awayScore90 === 0
-
   if (prediction.noScorer) {
-    return wasGoalless ? 'hit' : 'miss'
+    return isGoalless(match) ? 'hit' : 'miss'
   }
 
   if (!prediction.firstScorerPlayerId) {
@@ -440,6 +431,24 @@ function normalGoalScorerIds(goalEvents: readonly MatchEvent[]) {
 
 function firstNormalScorerIdFor(match: Match, goalEvents: readonly MatchEvent[]) {
   return goalEvents.find((event) => !isOwnGoal(event) && event.playerId)?.playerId ?? match.firstScorerPlayerId
+}
+
+function isGoalless(match: Match) {
+  return match.homeScore90 === 0 && match.awayScore90 === 0
+}
+
+function hasFirstScorerBonus(match: Match, prediction: MatchPrediction, goalEvents: readonly MatchEvent[]) {
+  if (prediction.noScorer) {
+    return isGoalless(match)
+  }
+
+  const firstNormalScorerId = firstNormalScorerIdFor(match, goalEvents)
+
+  return Boolean(
+    prediction.firstScorerPlayerId &&
+      firstNormalScorerId &&
+      prediction.firstScorerPlayerId === firstNormalScorerId,
+  )
 }
 
 function outcomePoints(row: ResultPlayerRow) {

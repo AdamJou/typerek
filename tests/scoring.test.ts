@@ -62,7 +62,7 @@ describe('scoreMatchPrediction', () => {
     expect(score.totalPoints).toBe(2)
   })
 
-  it('awards no scorer bonus only for real 0:0', () => {
+  it('awards no scorer points and first-goal bonus for real 0:0', () => {
     const goallessMatch: Match = {
       ...baseMatch,
       homeScore90: 0,
@@ -79,8 +79,8 @@ describe('scoreMatchPrediction', () => {
     expect(score.outcomePoints).toBe(2)
     expect(score.exactScorePoints).toBe(5)
     expect(score.firstScorerPoints).toBe(1)
-    expect(score.bonusPoints).toBe(0)
-    expect(score.totalPoints).toBe(8)
+    expect(score.bonusPoints).toBe(2)
+    expect(score.totalPoints).toBe(10)
   })
 })
 
