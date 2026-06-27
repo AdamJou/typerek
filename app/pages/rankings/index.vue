@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ChevronDown } from 'lucide-vue-next'
-import { aggregateRanking, shouldUseGeneralRankingTieBreakers } from '~/utils/scoring'
+import { aggregateRanking, isKnockoutStage, shouldUseGeneralRankingTieBreakers } from '~/utils/scoring'
 
 const { currentStage, matches, members, ranking, rankingBreakdowns, stages } = useTyperekData()
 
@@ -71,7 +71,7 @@ watch(
       </div>
 
       <RankingPodium :rows="selectedStageRanking" />
-      <RankingTable :rows="selectedStageRanking" mode="stage" />
+      <RankingTable :rows="selectedStageRanking" mode="stage" :show-advancement="isKnockoutStage(selectedStage)" />
     </section>
 
     <section class="section-block">
@@ -84,7 +84,7 @@ watch(
       </div>
 
       <RankingPodium :rows="ranking" />
-      <RankingTable :rows="ranking" />
+      <RankingTable :rows="ranking" :show-advancement="isKnockoutStage(currentStage)" />
     </section>
   </section>
 </template>

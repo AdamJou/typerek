@@ -6,6 +6,7 @@ interface MatchResultBody {
   awayScore90?: number
   firstScorerPlayerId?: string | null
   noScorerConfirmed?: boolean
+  advancedTeamId?: string | null
   scorers?: MatchScorerBody[]
   reason?: string | null
 }
@@ -29,6 +30,7 @@ interface MatchRow {
   away_score_90: number | null
   first_scorer_player_id: string | null
   no_scorer_confirmed: boolean
+  advanced_team_id: string | null
   result_confirmed_at: string | null
   match_number: number | null
   round_name: string | null
@@ -54,7 +56,7 @@ interface MatchEventRow {
 }
 
 const matchSelect =
-  'id, tournament_id, stage_id, home_team_id, away_team_id, starts_at_utc, status, home_score_90, away_score_90, first_scorer_player_id, no_scorer_confirmed, result_confirmed_at, match_number, round_name, group_code, venue, home_placeholder, away_placeholder'
+  'id, tournament_id, stage_id, home_team_id, away_team_id, starts_at_utc, status, home_score_90, away_score_90, first_scorer_player_id, no_scorer_confirmed, advanced_team_id, result_confirmed_at, match_number, round_name, group_code, venue, home_placeholder, away_placeholder'
 const eventSelect =
   'id, match_id, provider, provider_event_id, event_type, minute, extra_minute, team_id, player_id, player_name, detail, created_at'
 
@@ -114,7 +116,7 @@ export default defineEventHandler(async (event) => {
   validateScorersForScore(payload, match)
 
   const firstScorerPlayerId = payload.noScorerConfirmed ? null : payload.scorers.find((scorer) => !scorer.ownGoal)?.playerId
-  const { data: savedMatchData, error: resultError } = await userClient.rpc('set_match_result_with_events', {
+  const { data: savedMatchData, error: resultError } = await userClient.rpc('set_match_result_with_advancement', {
     p_match_id: payload.matchId,
     p_home_score_90: payload.homeScore90,
     p_away_score_90: payload.awayScore90,
@@ -125,6 +127,7 @@ export default defineEventHandler(async (event) => {
       playerId: scorer.playerId,
       ownGoal: scorer.ownGoal,
     })),
+    p_advanced_team_id: payload.advancedTeamId,
     p_reason: payload.reason,
   })
 
@@ -152,7 +155,7 @@ export default defineEventHandler(async (event) => {
 function mapSupabaseRpcError(error: { code?: string; message?: string }) {
   const message = error.message ?? 'match_result_save_failed'
 
-  if (error.code === 'PGRST202' || message.includes('set_match_result_with_events')) {
+  if (error.code === 'PGRST202' || message.includes('set_match_result_with_advancement')) {
     return createError({
       statusCode: 500,
       statusMessage: 'match_result_migration_missing',
@@ -170,6 +173,11 @@ function mapSupabaseRpcError(error: { code?: string; message?: string }) {
     'no_scorer_requires_zero_zero',
     'goal_count_mismatch',
     'goal_team_count_mismatch',
+    'advanced_team_required',
+    'advanced_team_not_in_match',
+    'advanced_team_conflicts_with_score',
+    'progression_target_already_confirmed',
+    'progression_target_has_predictions',
     'match_not_found',
   ]
 
@@ -217,6 +225,7 @@ function normalizePayload(body: MatchResultBody) {
     homeScore90,
     awayScore90,
     noScorerConfirmed: Boolean(body.noScorerConfirmed),
+    advancedTeamId: body.advancedTeamId ? String(body.advancedTeamId) : null,
     reason: body.reason?.trim() || null,
     scorers,
   }
@@ -277,6 +286,7 @@ function mapMatch(row: MatchRow) {
     awayScore90: row.away_score_90,
     firstScorerPlayerId: row.first_scorer_player_id,
     noScorerConfirmed: row.no_scorer_confirmed,
+    advancedTeamId: row.advanced_team_id,
     resultConfirmedAt: row.result_confirmed_at,
     matchNumber: row.match_number,
     roundName: row.round_name,

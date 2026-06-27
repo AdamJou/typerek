@@ -337,6 +337,7 @@ onBeforeUnmount(() => {
     <PredictionForm
       v-if="canSubmitPrediction && (!existingPrediction || isEditing)"
       :match="match"
+      :stage="stage"
       :league-id="league.id"
       :user-id="activeUserId"
       :players="matchPlayers"

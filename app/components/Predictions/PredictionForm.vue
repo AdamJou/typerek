@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Save, Trash2 } from 'lucide-vue-next'
-import type { Match, MatchPrediction, Player, Team } from '~/types/domain'
+import type { Match, MatchPrediction, Player, Team, TournamentStage } from '~/types/domain'
 import { displayTeamName, getTeamFlag } from '~/utils/footballUi'
-import { isPredictionLocked, validatePredictionInput } from '~/utils/scoring'
+import { isKnockoutStage, isPredictionLocked, validatePredictionInput } from '~/utils/scoring'
 
 const props = defineProps<{
   match: Match
+  stage: TournamentStage
   leagueId: string
   userId: string
   players: readonly Player[]
@@ -22,8 +23,30 @@ const homeScore = shallowRef(props.existingPrediction?.predictedHomeScore ?? 0)
 const awayScore = shallowRef(props.existingPrediction?.predictedAwayScore ?? 0)
 const firstScorerPlayerId = shallowRef<string | null>(props.existingPrediction?.firstScorerPlayerId ?? null)
 const noScorer = shallowRef(props.existingPrediction?.noScorer ?? false)
+const predictedAdvancedTeamId = shallowRef<string | null>(props.existingPrediction?.predictedAdvancedTeamId ?? null)
 const homeTeam = computed(() => props.teams.find((team) => team.id === props.match.homeTeamId))
 const awayTeam = computed(() => props.teams.find((team) => team.id === props.match.awayTeamId))
+const matchTeams = computed(() => [homeTeam.value, awayTeam.value].filter((team): team is Team => Boolean(team)))
+const knockout = computed(() => isKnockoutStage(props.stage))
+const predictedDraw = computed(() => homeScore.value === awayScore.value)
+const impliedAdvancedTeamName = computed(() => {
+  if (!knockout.value || predictedDraw.value) {
+    return ''
+  }
+
+  return displayTeamName(homeScore.value > awayScore.value ? homeTeam.value : awayTeam.value)
+})
+const resolvedPredictedAdvancedTeamId = computed(() => {
+  if (!knockout.value) {
+    return null
+  }
+
+  if (predictedDraw.value) {
+    return predictedAdvancedTeamId.value
+  }
+
+  return homeScore.value > awayScore.value ? props.match.homeTeamId : props.match.awayTeamId
+})
 const locked = computed(() => isPredictionLocked(props.match))
 const homeFlag = computed(() => getTeamFlag(homeTeam.value))
 const awayFlag = computed(() => getTeamFlag(awayTeam.value))
@@ -33,6 +56,11 @@ const validationMessage = computed(() =>
     predictedAwayScore: awayScore.value,
     firstScorerPlayerId: firstScorerPlayerId.value,
     noScorer: noScorer.value,
+    predictedAdvancedTeamId: resolvedPredictedAdvancedTeamId.value,
+  }, {
+    isKnockout: knockout.value,
+    homeTeamId: props.match.homeTeamId,
+    awayTeamId: props.match.awayTeamId,
   }),
 )
 
@@ -47,6 +75,7 @@ watch(
     awayScore.value = prediction.predictedAwayScore
     firstScorerPlayerId.value = prediction.firstScorerPlayerId
     noScorer.value = prediction.noScorer
+    predictedAdvancedTeamId.value = prediction.predictedAdvancedTeamId
   },
 )
 
@@ -72,6 +101,7 @@ function submitPrediction() {
     predictedAwayScore: awayScore.value,
     firstScorerPlayerId: noScorer.value ? null : firstScorerPlayerId.value,
     noScorer: noScorer.value,
+    predictedAdvancedTeamId: resolvedPredictedAdvancedTeamId.value,
     updatedAt: new Date().toISOString(),
   })
 }
@@ -114,6 +144,21 @@ function removePrediction() {
       />
     </div>
 
+    <div v-if="knockout" class="knockout-notice">
+      <p>Wynik i strzelcy liczą się do 90. minuty.</p>
+      <p v-if="predictedDraw">Przy remisie wskaż drużynę, która awansuje dalej.</p>
+      <p v-else>
+        Twój typ wskazuje zwycięzcę: <strong>{{ impliedAdvancedTeamName }}</strong>. Automatycznie zakładamy, że ta drużyna awansuje dalej.
+      </p>
+    </div>
+
+    <AdvancementPicker
+      v-if="knockout && predictedDraw"
+      v-model="predictedAdvancedTeamId"
+      :teams="matchTeams"
+      :disabled="locked"
+    />
+
     <div class="scorer-section">
       <PlayerSelect v-model="firstScorerPlayerId" :players="props.players" :teams="props.teams" :disabled="noScorer" />
       <NoScorerToggle v-model="noScorer" />
@@ -152,7 +197,25 @@ function removePrediction() {
 
 .prediction-form-header h2,
 .prediction-form-header p,
+.knockout-notice,
 .validation-message {
+  margin: 0;
+}
+
+.knockout-notice {
+  display: grid;
+  gap: 3px;
+  border-left: 3px solid #d7b46a;
+  border-radius: 0 7px 7px 0;
+  background: #fff8e8;
+  padding: 10px 12px;
+  color: #665224;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.knockout-notice p {
   margin: 0;
 }
 

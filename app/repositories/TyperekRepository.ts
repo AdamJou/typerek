@@ -27,6 +27,7 @@ export interface UpsertMatchPredictionPayload {
   predictedAwayScore: number
   firstScorerPlayerId: string | null
   noScorer: boolean
+  predictedAdvancedTeamId: string | null
 }
 
 export interface SetMatchResultPayload {
@@ -35,7 +36,15 @@ export interface SetMatchResultPayload {
   awayScore90: number
   firstScorerPlayerId: string | null
   noScorerConfirmed: boolean
+  advancedTeamId: string | null
   scorers?: MatchScorerInput[]
+  reason?: string | null
+}
+
+export interface SetMatchTeamsPayload {
+  matchId: string
+  homeTeamId: string
+  awayTeamId: string
   reason?: string | null
 }
 
@@ -125,6 +134,7 @@ interface MatchRow {
   away_score_90: number | null
   first_scorer_player_id: string | null
   no_scorer_confirmed: boolean
+  advanced_team_id: string | null
   result_confirmed_at: string | null
   match_number: number | null
   round_name: string | null
@@ -178,6 +188,7 @@ interface MatchPredictionRow {
   predicted_away_score: number
   first_scorer_player_id: string | null
   no_scorer: boolean
+  predicted_advanced_team_id: string | null
   updated_at: string
 }
 
@@ -244,6 +255,7 @@ interface ScoreBreakdownRow {
   outcome_points: number
   exact_score_points: number
   first_scorer_points: number
+  advancement_points: number
   bonus_points: number
   total_points: number
 }
@@ -405,7 +417,7 @@ export class TyperekRepository {
       this.supabase
         .from('matches')
         .select(
-          'id, tournament_id, stage_id, home_team_id, away_team_id, starts_at_utc, status, home_score_90, away_score_90, first_scorer_player_id, no_scorer_confirmed, result_confirmed_at, match_number, round_name, group_code, venue, home_placeholder, away_placeholder',
+          'id, tournament_id, stage_id, home_team_id, away_team_id, starts_at_utc, status, home_score_90, away_score_90, first_scorer_player_id, no_scorer_confirmed, advanced_team_id, result_confirmed_at, match_number, round_name, group_code, venue, home_placeholder, away_placeholder',
         )
         .eq('tournament_id', tournamentId)
         .order('match_number', { ascending: true })
@@ -495,7 +507,7 @@ export class TyperekRepository {
       this.supabase
         .from('match_predictions')
         .select(
-          'id, league_id, user_id, match_id, predicted_home_score, predicted_away_score, first_scorer_player_id, no_scorer, updated_at',
+          'id, league_id, user_id, match_id, predicted_home_score, predicted_away_score, first_scorer_player_id, no_scorer, predicted_advanced_team_id, updated_at',
         )
         .eq('league_id', leagueId)
         .order('updated_at', { ascending: false })
@@ -603,7 +615,7 @@ export class TyperekRepository {
       this.supabase
         .from('score_breakdowns')
         .select(
-          'league_id, user_id, source_type, source_id, stage_id, outcome_points, exact_score_points, first_scorer_points, bonus_points, total_points',
+          'league_id, user_id, source_type, source_id, stage_id, outcome_points, exact_score_points, first_scorer_points, advancement_points, bonus_points, total_points',
         )
         .eq('league_id', leagueId)
         .range(from, to),
@@ -671,6 +683,7 @@ export class TyperekRepository {
       p_predicted_away_score: payload.predictedAwayScore,
       p_first_scorer_player_id: payload.firstScorerPlayerId,
       p_no_scorer: payload.noScorer,
+      p_predicted_advanced_team_id: payload.predictedAdvancedTeamId,
     })
 
     if (error) {
@@ -708,7 +721,7 @@ export class TyperekRepository {
       this.supabase
         .from('match_predictions')
         .select(
-          'id, league_id, user_id, match_id, predicted_home_score, predicted_away_score, first_scorer_player_id, no_scorer, updated_at',
+          'id, league_id, user_id, match_id, predicted_home_score, predicted_away_score, first_scorer_player_id, no_scorer, predicted_advanced_team_id, updated_at',
         )
         .eq('league_id', leagueId)
         .eq('match_id', matchId)
@@ -728,7 +741,7 @@ export class TyperekRepository {
       this.supabase
         .from('match_predictions')
         .select(
-          'id, league_id, user_id, match_id, predicted_home_score, predicted_away_score, first_scorer_player_id, no_scorer, updated_at',
+          'id, league_id, user_id, match_id, predicted_home_score, predicted_away_score, first_scorer_player_id, no_scorer, predicted_advanced_team_id, updated_at',
         )
         .eq('league_id', leagueId)
         .eq('user_id', userId)
@@ -828,12 +841,18 @@ export class TyperekRepository {
   }
 
   async setMatchResult(payload: SetMatchResultPayload) {
-    const { data, error } = await this.supabase.rpc('set_match_result', {
+    const { data, error } = await this.supabase.rpc('set_match_result_with_advancement', {
       p_match_id: payload.matchId,
       p_home_score_90: payload.homeScore90,
       p_away_score_90: payload.awayScore90,
       p_first_scorer_player_id: payload.noScorerConfirmed ? null : payload.firstScorerPlayerId,
       p_no_scorer_confirmed: payload.noScorerConfirmed,
+      p_scorers: (payload.scorers ?? []).map((scorer) => ({
+        teamId: scorer.teamId,
+        playerId: scorer.playerId,
+        ownGoal: scorer.ownGoal ?? false,
+      })),
+      p_advanced_team_id: payload.advancedTeamId,
       p_reason: payload.reason ?? null,
     })
 
@@ -843,6 +862,25 @@ export class TyperekRepository {
 
     if (!data) {
       throw new Error('Nie udało się zapisać wyniku meczu.')
+    }
+
+    return mapMatch(data as MatchRow)
+  }
+
+  async setMatchTeams(payload: SetMatchTeamsPayload) {
+    const { data, error } = await this.supabase.rpc('set_match_teams_admin', {
+      p_match_id: payload.matchId,
+      p_home_team_id: payload.homeTeamId,
+      p_away_team_id: payload.awayTeamId,
+      p_reason: payload.reason ?? null,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    if (!data) {
+      throw new Error('Nie udało się zapisać drużyn meczu.')
     }
 
     return mapMatch(data as MatchRow)
@@ -919,6 +957,7 @@ function mapMatch(row: MatchRow): Match {
     awayScore90: row.away_score_90,
     firstScorerPlayerId: row.first_scorer_player_id,
     noScorerConfirmed: row.no_scorer_confirmed,
+    advancedTeamId: row.advanced_team_id,
     resultConfirmedAt: row.result_confirmed_at,
     matchNumber: row.match_number,
     roundName: row.round_name,
@@ -976,6 +1015,7 @@ function mapMatchPrediction(row: MatchPredictionRow): MatchPrediction {
     predictedAwayScore: row.predicted_away_score,
     firstScorerPlayerId: row.first_scorer_player_id,
     noScorer: row.no_scorer,
+    predictedAdvancedTeamId: row.predicted_advanced_team_id,
     updatedAt: row.updated_at,
   }
 }
@@ -1040,6 +1080,7 @@ function mapScoreBreakdown(row: ScoreBreakdownRow): ScoreBreakdown {
     outcomePoints: row.outcome_points,
     exactScorePoints: row.exact_score_points,
     firstScorerPoints: row.first_scorer_points,
+    advancementPoints: row.advancement_points,
     bonusPoints: row.bonus_points,
     totalPoints: row.total_points,
   }

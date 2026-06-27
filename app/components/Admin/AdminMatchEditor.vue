@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { Loader2, Save } from 'lucide-vue-next'
-import type { Match, MatchEvent, MatchScorerInput, Player, Team } from '~/types/domain'
+import type { Match, MatchEvent, MatchScorerInput, Player, Team, TournamentStage } from '~/types/domain'
 import { displayTeamName, getTeamFlag } from '~/utils/footballUi'
+import { isKnockoutStage } from '~/utils/scoring'
 
 const props = defineProps<{
   match: Match
+  stage: TournamentStage
   matchEvents: readonly MatchEvent[]
   homeTeam: Team
   awayTeam: Team
@@ -19,6 +21,7 @@ const { setMatchResult } = useTyperekData()
 const homeScore = shallowRef(props.match.homeScore90 ?? 0)
 const awayScore = shallowRef(props.match.awayScore90 ?? 0)
 const noScorerConfirmed = shallowRef(props.match.noScorerConfirmed)
+const advancedTeamId = shallowRef<string | null>(props.match.advancedTeamId)
 const goalScorers = ref<MatchScorerInput[]>([])
 const isSaving = shallowRef(false)
 const errorMessage = shallowRef('')
@@ -30,9 +33,19 @@ const homeFlag = computed(() => getTeamFlag(props.homeTeam))
 const awayFlag = computed(() => getTeamFlag(props.awayTeam))
 const totalGoals = computed(() => homeScore.value + awayScore.value)
 const isScoreless = computed(() => totalGoals.value === 0)
+const knockout = computed(() => isKnockoutStage(props.stage))
+const matchTeams = computed(() => [props.homeTeam, props.awayTeam])
 const validationMessage = computed(() => {
   if (homeScore.value < 0 || awayScore.value < 0) {
     return 'Wynik nie może być ujemny.'
+  }
+
+  if (knockout.value && !advancedTeamId.value) {
+    return 'Wskaż drużynę, która awansowała dalej.'
+  }
+
+  if (knockout.value && ![props.homeTeam.id, props.awayTeam.id].includes(advancedTeamId.value ?? '')) {
+    return 'Awansująca drużyna musi grać w tym meczu.'
   }
 
   if (isScoreless.value) {
@@ -63,12 +76,17 @@ watch(
     homeScore.value = match.homeScore90 ?? 0
     awayScore.value = match.awayScore90 ?? 0
     noScorerConfirmed.value = match.noScorerConfirmed || ((match.homeScore90 ?? 0) === 0 && (match.awayScore90 ?? 0) === 0)
+    advancedTeamId.value = match.advancedTeamId
     goalScorers.value = goalScorersFromEvents()
   },
   { immediate: true },
 )
 
 watch([homeScore, awayScore], () => {
+  if (knockout.value && homeScore.value !== awayScore.value) {
+    advancedTeamId.value = homeScore.value > awayScore.value ? props.homeTeam.id : props.awayTeam.id
+  }
+
   if (isScoreless.value) {
     noScorerConfirmed.value = true
     goalScorers.value = []
@@ -129,6 +147,7 @@ async function submitResult() {
       awayScore90: awayScore.value,
       firstScorerPlayerId: isScoreless.value ? null : goalScorers.value.find((goal) => !goal.ownGoal)?.playerId ?? null,
       noScorerConfirmed: isScoreless.value && noScorerConfirmed.value,
+      advancedTeamId: knockout.value ? advancedTeamId.value : null,
       scorers: isScoreless.value ? [] : goalScorers.value,
       reason: null,
     })
@@ -171,6 +190,18 @@ function matchResultErrorMessage(error: unknown) {
 
   if (message.includes('goal_count_mismatch') || message.includes('goal_team_count_mismatch')) {
     return 'Lista goli nie zgadza się z wynikiem meczu.'
+  }
+
+  if (message.includes('advanced_team_required')) {
+    return 'Wskaż drużynę, która awansowała dalej.'
+  }
+
+  if (message.includes('advanced_team_not_in_match') || message.includes('advanced_team_conflicts_with_score')) {
+    return 'Awansująca drużyna nie zgadza się z meczem lub wynikiem po 90 minutach.'
+  }
+
+  if (message.includes('progression_target_has_predictions')) {
+    return 'Kolejny mecz ma już zapisane typy, więc nie można zmienić jego uczestnika.'
   }
 
   if (message.includes('invalid_score')) {
@@ -239,6 +270,19 @@ function extractErrorMessage(error: unknown) {
         :flag-emoji="awayFlag.emoji"
       />
     </div>
+
+    <p v-if="knockout" class="knockout-notice">
+      Zapisz wynik i strzelców wyłącznie z 90 minut. Awans obejmuje dogrywkę i rzuty karne.
+    </p>
+
+    <AdvancementPicker
+      v-if="knockout"
+      v-model="advancedTeamId"
+      :teams="matchTeams"
+      label="Która drużyna awansowała?"
+      helper="Zwycięzca zostanie automatycznie wpisany do kolejnego meczu drabinki."
+      :disabled="isSaving"
+    />
 
     <div class="scorer-section">
       <div class="field-heading">
@@ -312,6 +356,18 @@ function extractErrorMessage(error: unknown) {
 .scorer-section {
   display: grid;
   gap: 8px;
+}
+
+.knockout-notice {
+  margin: 0;
+  border-left: 3px solid #d7b46a;
+  border-radius: 0 7px 7px 0;
+  background: #fff8e8;
+  padding: 10px 12px;
+  color: #665224;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .field-heading {

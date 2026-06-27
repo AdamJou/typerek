@@ -5,6 +5,7 @@ import type { RankingRow } from '~/types/domain'
 const props = defineProps<{
   rows: readonly RankingRow[]
   mode?: 'general' | 'stage'
+  showAdvancement?: boolean
 }>()
 
 const rankingRules = computed(() =>
@@ -50,6 +51,7 @@ const displayedRows = computed(() => {
           <th>Wynik</th>
           <th>Dokł.</th>
           <th>Strz.</th>
+          <th v-if="props.showAdvancement">Awanse</th>
         </tr>
       </thead>
       <tbody>
@@ -69,6 +71,7 @@ const displayedRows = computed(() => {
           <td>{{ row.outcomePoints }}</td>
           <td>{{ row.exactScorePoints }}</td>
           <td>{{ row.firstScorerPoints }}</td>
+          <td v-if="props.showAdvancement">{{ row.advancementPoints }}</td>
         </tr>
       </tbody>
       </table>

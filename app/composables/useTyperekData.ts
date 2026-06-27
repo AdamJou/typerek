@@ -21,6 +21,7 @@ import type {
 import type {
   CreateBonusQuestionPayload,
   SetMatchResultPayload,
+  SetMatchTeamsPayload,
   UpsertBonusPredictionPayload,
   UpsertMatchPredictionPayload,
 } from '~/repositories/TyperekRepository'
@@ -80,6 +81,7 @@ export function useTyperekData() {
       predictedAwayScore: prediction.predictedAwayScore,
       firstScorerPlayerId: prediction.firstScorerPlayerId,
       noScorer: prediction.noScorer,
+      predictedAdvancedTeamId: prediction.predictedAdvancedTeamId,
     })
 
     return savedPrediction
@@ -143,6 +145,14 @@ export function useTyperekData() {
     return response.match
   }
 
+  async function setMatchTeams(payload: SetMatchTeamsPayload) {
+    const repository = getRepository()
+    const savedMatch = await repository.setMatchTeams(payload)
+    replaceMatchInState(savedMatch)
+    await refresh()
+    return savedMatch
+  }
+
   return {
     tournament,
     league,
@@ -178,6 +188,7 @@ export function useTyperekData() {
     createBonusQuestion,
     deleteBonusQuestion,
     setMatchResult,
+    setMatchTeams,
   }
 }
 

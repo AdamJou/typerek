@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { aggregateRanking, shouldUseGeneralRankingTieBreakers } from '~/utils/scoring'
+import { aggregateRanking, isKnockoutStage, shouldUseGeneralRankingTieBreakers } from '~/utils/scoring'
 
 const route = useRoute()
 const { members, rankingBreakdowns, stages } = useTyperekData()
@@ -20,7 +20,7 @@ const rows = computed(() =>
       <p>Punkty zdobyte w wybranym etapie turnieju.</p>
     </div>
 
-    <RankingTable :rows="rows" mode="stage" />
+    <RankingTable :rows="rows" mode="stage" :show-advancement="isKnockoutStage(activeStage)" />
   </section>
 </template>
 

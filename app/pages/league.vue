@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BarChart3, CalendarClock, CalendarDays, CircleAlert, Clock3, Medal, TicketCheck, Users, ChevronRight } from 'lucide-vue-next'
+import { BarChart3, CalendarClock, CalendarDays, CircleAlert, CircleHelp, Clock3, Medal, TicketCheck, Users, ChevronRight } from 'lucide-vue-next'
 import type { Match } from '~/types/domain'
 import { isMatchToday, isUpcomingMatchToday, isUpcomingMatchWithinHours } from '~/utils/footballUi'
 import { filledBonusCount, isBonusAnswerFilled, isBonusLocked, resolveBonusGlobalLockAt, resolveBonusQuestion } from '~/utils/bonus'
@@ -13,12 +13,14 @@ const currentMember = computed(() => members.find((member) => member.userId === 
 const { saveLeagueMatchReturnState } = useLeagueMatchReturnState(hasLoaded)
 const { showUpcomingTodayOnly } = useUpcomingMatchesPreferences()
 const now = shallowRef(new Date())
+const advancementRulesOpen = shallowRef(false)
 
 const scoringItems = [
-  { points: defaultScoringRules.exactScoreBonus, label: 'dokładny wynik' },
-  { points: defaultScoringRules.resultPoints, label: 'rezultat W/D/L' },
-  { points: defaultScoringRules.firstScorerPoints, label: 'strzelec gola' },
-  { points: defaultScoringRules.firstScorerBonusPoints, label: 'bonus za pierwszą bramkę' },
+  { points: String(defaultScoringRules.exactScoreBonus), label: 'dokładny wynik' },
+  { points: String(defaultScoringRules.resultPoints), label: 'rezultat W/D/L' },
+  { points: String(defaultScoringRules.firstScorerPoints), label: 'strzelec gola' },
+  { points: String(defaultScoringRules.firstScorerBonusPoints), label: 'bonus za pierwszą bramkę' },
+  { points: '1/2', label: 'awans w fazie pucharowej', hasDetails: true },
 ]
 
 const nextMatches = computed(() =>
@@ -249,22 +251,6 @@ function bonusCardMessage() {
             Prywatna liga MŚ 2026.
           </p>
 
-          <div class="hero-rules">
-            <div class="hero-rules-heading">
-              <span>Zasady punktacji za 1 mecz</span>
-            </div>
-
-            <div class="scoring-summary" aria-label="Punktacja za jeden mecz">
-              <article v-for="item in scoringItems" :key="item.label" class="scoring-item">
-                <strong>{{ item.points }}</strong>
-                <span>{{ item.label }}</span>
-              </article>
-              <article class="scoring-item scoring-total">
-                <strong>10</strong>
-                <span>maksymalnie</span>
-              </article>
-            </div>
-          </div>
         </div>
 
         <p v-else>
@@ -277,8 +263,37 @@ function bonusCardMessage() {
         </NuxtLink>
       </div>
 
+      <div v-if="hasLeague" class="hero-rules">
+        <div class="hero-rules-heading">
+          <span>Zasady punktacji za 1 mecz</span>
+        </div>
+
+        <div class="scoring-summary" aria-label="Punktacja za jeden mecz">
+          <article v-for="item in scoringItems" :key="item.label" class="scoring-item">
+            <button
+              v-if="item.hasDetails"
+              class="scoring-help-button"
+              type="button"
+              aria-label="Wyjaśnij punktację za awans"
+              aria-haspopup="dialog"
+              @click="advancementRulesOpen = true"
+            >
+              <CircleHelp :size="18" aria-hidden="true" />
+            </button>
+            <strong>{{ item.points }}</strong>
+            <span>{{ item.label }}</span>
+          </article>
+          <article class="scoring-item scoring-total">
+            <strong>10/12</strong>
+            <span>maks. grupa / faza pucharowa</span>
+          </article>
+        </div>
+      </div>
+
       <div class="league-hero-side">
-        <div class="league-hero-ball" aria-hidden="true">MŚ<br>2026</div>
+        <div class="league-hero-emblem" aria-hidden="true">
+          <img class="league-hero-logo" src="/wc26.png" alt="" width="100" height="100">
+        </div>
       </div>
     </div>
 
@@ -437,6 +452,8 @@ function bonusCardMessage() {
       :teams="teams"
       :players="players"
     />
+
+    <AdvancementScoringModal v-if="advancementRulesOpen" @close="advancementRulesOpen = false" />
   </section>
 </template>
 
@@ -470,6 +487,7 @@ function bonusCardMessage() {
 
 .league-hero-copy {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   height: 100%;
 }
@@ -525,7 +543,8 @@ function bonusCardMessage() {
 }
 
 .hero-rules {
-  max-width: 860px;
+  width: 100%;
+  min-width: 0;
 }
 
 .hero-rules-heading {
@@ -552,17 +571,48 @@ function bonusCardMessage() {
 
 .scoring-summary {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(132px, 1fr));
   gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+  scrollbar-width: thin;
 }
 
 .scoring-item {
+  position: relative;
   display: grid;
   gap: 6px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.1);
   padding: 12px;
+  min-height: 104px;
+  align-content: space-between;
+}
+
+.scoring-help-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.scoring-help-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.scoring-help-button:focus-visible {
+  outline: 3px solid rgba(255, 242, 207, 0.38);
+  outline-offset: 2px;
 }
 
 .scoring-item strong {
@@ -609,14 +659,22 @@ function bonusCardMessage() {
   justify-content: flex-end;
 }
 
-.league-hero-ball {
-  justify-self: end;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  padding: 14px 16px;
-  font-size: 34px;
-  font-weight: 900;
-  line-height: 1;
+.league-hero-emblem {
+  display: grid;
+  width: clamp(112px, 14vw, 148px);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid rgba(255, 226, 158, 0.28);
+  border-radius: 18px;
+  background: white;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 18px 38px rgba(4, 20, 13, 0.24);
+}
+
+.league-hero-logo {
+  display: block;
+  width: min(82%, 120px);
+  height: auto;
+  filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.24));
 }
 
 .summary-grid {
@@ -964,17 +1022,26 @@ function bonusCardMessage() {
     padding: 36px;
   }
 
+  .hero-rules {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .league-hero-copy {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .league-hero-side {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
   .summary-grid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .match-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 920px) {
-  .scoring-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -999,10 +1066,6 @@ function bonusCardMessage() {
   .hero-rules-heading {
     align-items: start;
     flex-direction: column;
-  }
-
-  .scoring-summary {
-    grid-template-columns: 1fr;
   }
 
   .results-updated-chip {

@@ -66,6 +66,7 @@ export interface Match {
   awayScore90: number | null
   firstScorerPlayerId: string | null
   noScorerConfirmed: boolean
+  advancedTeamId: string | null
   resultConfirmedAt: string | null
 }
 
@@ -116,6 +117,7 @@ export interface MatchPrediction {
   predictedAwayScore: number
   firstScorerPlayerId: string | null
   noScorer: boolean
+  predictedAdvancedTeamId: string | null
   updatedAt: string
 }
 
@@ -140,6 +142,7 @@ export interface ScoreBreakdown {
   outcomePoints: number
   exactScorePoints: number
   firstScorerPoints: number
+  advancementPoints: number
   bonusPoints: number
   totalPoints: number
 }
@@ -152,6 +155,7 @@ export interface RankingRow {
   outcomePoints: number
   exactScorePoints: number
   firstScorerPoints: number
+  advancementPoints: number
   bonusPoints: number
 }
 

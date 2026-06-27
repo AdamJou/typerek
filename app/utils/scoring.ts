@@ -18,13 +18,24 @@ const generalTieBreakerStageCodes: readonly TournamentStage['code'][] = [
   'final',
 ]
 
+const knockoutStageCodes: readonly TournamentStage['code'][] = [
+  'round_of_32',
+  'round_of_16',
+  'quarter_finals',
+  'semi_finals',
+  'third_place',
+  'final',
+]
+
+export const temporaryPredictionStageCode: TournamentStage['code'] | null = null
+
 interface AggregateRankingOptions {
   useGeneralTieBreakers?: boolean
 }
 
 type RankingStats = Pick<
   RankingRow,
-  'totalPoints' | 'outcomePoints' | 'exactScorePoints' | 'firstScorerPoints' | 'bonusPoints'
+  'totalPoints' | 'outcomePoints' | 'exactScorePoints' | 'firstScorerPoints' | 'advancementPoints' | 'bonusPoints'
 >
 
 function resultSign(home: number, away: number) {
@@ -77,10 +88,18 @@ export function stageEndsAt(stageId: string, matches: readonly Pick<Match, 'stag
 }
 
 export function currentPredictionStageId(
-  stages: readonly Pick<Match, 'stageId'>[] | readonly { id: string }[],
+  stages: readonly Pick<Match, 'stageId'>[] | readonly { id: string; code?: TournamentStage['code'] }[],
   matches: readonly Pick<Match, 'stageId' | 'startsAtUtc'>[],
   now = new Date(),
 ) {
+  const temporaryStage = stages.find(
+    (stage) => 'id' in stage && stage.code === temporaryPredictionStageCode,
+  )
+
+  if (temporaryStage && 'id' in temporaryStage) {
+    return temporaryStage.id
+  }
+
   const orderedStages = stages
     .map((stage) => {
       const stageId = 'id' in stage ? stage.id : stage.stageId
@@ -107,7 +126,7 @@ export function shouldUseGeneralRankingTieBreakers(stage: Pick<TournamentStage, 
 
 export function isStagePredictionOpen(
   stageId: string,
-  stages: readonly Pick<Match, 'stageId'>[] | readonly { id: string }[],
+  stages: readonly Pick<Match, 'stageId'>[] | readonly { id: string; code?: TournamentStage['code'] }[],
   matches: readonly Pick<Match, 'stageId' | 'startsAtUtc'>[],
   now = new Date(),
 ) {
@@ -116,14 +135,25 @@ export function isStagePredictionOpen(
 
 export function isMatchPredictionOpen(
   match: Pick<Match, 'stageId' | 'startsAtUtc' | 'status'>,
-  stages: readonly Pick<Match, 'stageId'>[] | readonly { id: string }[],
+  stages: readonly Pick<Match, 'stageId'>[] | readonly { id: string; code?: TournamentStage['code'] }[],
   matches: readonly Pick<Match, 'stageId' | 'startsAtUtc'>[],
   now = new Date(),
 ) {
   return match.status === 'scheduled' && isStagePredictionOpen(match.stageId, stages, matches, now) && !isPredictionLocked(match, now)
 }
 
-export function validatePredictionInput(prediction: Pick<MatchPrediction, 'predictedHomeScore' | 'predictedAwayScore' | 'firstScorerPlayerId' | 'noScorer'>) {
+export function isKnockoutStage(stage: Pick<TournamentStage, 'code'> | null | undefined) {
+  return Boolean(stage && knockoutStageCodes.includes(stage.code))
+}
+
+export function validatePredictionInput(
+  prediction: Pick<MatchPrediction, 'predictedHomeScore' | 'predictedAwayScore' | 'firstScorerPlayerId' | 'noScorer' | 'predictedAdvancedTeamId'>,
+  context: {
+    isKnockout?: boolean
+    homeTeamId?: string | null
+    awayTeamId?: string | null
+  } = {},
+) {
   if (prediction.predictedHomeScore < 0 || prediction.predictedAwayScore < 0) {
     return 'Wynik nie może być ujemny.'
   }
@@ -136,7 +166,41 @@ export function validatePredictionInput(prediction: Pick<MatchPrediction, 'predi
     return 'Wybierz pierwszego strzelca albo opcję braku strzelca.'
   }
 
+  if (context.isKnockout && prediction.predictedHomeScore === prediction.predictedAwayScore) {
+    if (!prediction.predictedAdvancedTeamId) {
+      return 'Wskaż drużynę, która awansuje dalej.'
+    }
+
+    if (![context.homeTeamId, context.awayTeamId].includes(prediction.predictedAdvancedTeamId)) {
+      return 'Wybrana drużyna nie gra w tym meczu.'
+    }
+  }
+
   return null
+}
+
+export function advancementBonusPoints(
+  match: Pick<Match, 'homeTeamId' | 'awayTeamId' | 'homeScore90' | 'awayScore90' | 'advancedTeamId'>,
+  prediction: Pick<MatchPrediction, 'predictedHomeScore' | 'predictedAwayScore' | 'predictedAdvancedTeamId'>,
+) {
+  if (!match.advancedTeamId || match.homeScore90 === null || match.awayScore90 === null) {
+    return 0
+  }
+
+  if (prediction.predictedHomeScore === prediction.predictedAwayScore) {
+    if (prediction.predictedAdvancedTeamId !== match.advancedTeamId) {
+      return 0
+    }
+
+    return match.homeScore90 === match.awayScore90 ? 2 : 1
+  }
+
+  const predictedAdvancedTeamId =
+    prediction.predictedHomeScore > prediction.predictedAwayScore
+      ? match.homeTeamId
+      : match.awayTeamId
+
+  return predictedAdvancedTeamId === match.advancedTeamId ? 1 : 0
 }
 
 export function scoreMatchPrediction(
@@ -155,6 +219,7 @@ export function scoreMatchPrediction(
       outcomePoints: 0,
       exactScorePoints: 0,
       firstScorerPoints: 0,
+      advancementPoints: 0,
       bonusPoints: 0,
       totalPoints: 0,
     }
@@ -196,6 +261,7 @@ export function scoreMatchPrediction(
     prediction.firstScorerPlayerId === firstNormalScorerId
   const firstScorerPoints = correctNoScorer || correctScorer ? rules.firstScorerPoints : 0
   const bonusPoints = correctNoScorer || correctFirstScorer ? rules.firstScorerBonusPoints : 0
+  const advancementPoints = advancementBonusPoints(match, prediction)
 
   return {
     leagueId: prediction.leagueId,
@@ -206,8 +272,9 @@ export function scoreMatchPrediction(
     outcomePoints,
     exactScorePoints,
     firstScorerPoints,
+    advancementPoints,
     bonusPoints,
-    totalPoints: outcomePoints + exactScorePoints + firstScorerPoints + bonusPoints,
+    totalPoints: outcomePoints + exactScorePoints + firstScorerPoints + bonusPoints + advancementPoints,
   }
 }
 
@@ -303,6 +370,7 @@ export function aggregateRanking(
       outcomePoints: row.outcomePoints,
       exactScorePoints: row.exactScorePoints,
       firstScorerPoints: row.firstScorerPoints,
+      advancementPoints: row.advancementPoints,
       bonusPoints: row.bonusPoints,
       position,
     }
@@ -321,6 +389,7 @@ function aggregateRankingStats(breakdowns: readonly ScoreBreakdown[]): RankingSt
       (sum, row) => sum + row.firstScorerPoints + row.bonusPoints,
       0,
     ),
+    advancementPoints: matchBreakdowns.reduce((sum, row) => sum + row.advancementPoints, 0),
     bonusPoints: bonusBreakdowns.reduce((sum, row) => sum + row.bonusPoints, 0),
   }
 }

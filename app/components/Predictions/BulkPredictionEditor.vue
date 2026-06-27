@@ -1,19 +1,21 @@
 <script setup lang="ts">
-import type { Match, Player, Team } from '~/types/domain'
+import type { Match, Player, Team, TournamentStage } from '~/types/domain'
 import { displayTeamName, getTeamFlag } from '~/utils/footballUi'
-import { validatePredictionInput } from '~/utils/scoring'
+import { isKnockoutStage, validatePredictionInput } from '~/utils/scoring'
 
 export interface BulkPredictionDraft {
   predictedHomeScore: number
   predictedAwayScore: number
   firstScorerPlayerId: string | null
   noScorer: boolean
+  predictedAdvancedTeamId: string | null
 }
 
 const draft = defineModel<BulkPredictionDraft>('draft', { required: true })
 
 const props = defineProps<{
   match: Match
+  stage: TournamentStage
   players: readonly Player[]
   teams: readonly Team[]
 }>()
@@ -24,8 +26,10 @@ const emit = defineEmits<{
 
 const homeTeam = computed(() => props.teams.find((team) => team.id === props.match.homeTeamId))
 const awayTeam = computed(() => props.teams.find((team) => team.id === props.match.awayTeamId))
+const matchTeams = computed(() => [homeTeam.value, awayTeam.value].filter((team): team is Team => Boolean(team)))
 const homeFlag = computed(() => getTeamFlag(homeTeam.value))
 const awayFlag = computed(() => getTeamFlag(awayTeam.value))
+const knockout = computed(() => isKnockoutStage(props.stage))
 
 const homeScore = computed({
   get: () => draft.value.predictedHomeScore,
@@ -61,12 +65,37 @@ const noScorer = computed({
   },
 })
 
+const predictedAdvancedTeamId = computed({
+  get: () => draft.value.predictedAdvancedTeamId,
+  set: (value: string | null) => {
+    draft.value = { ...draft.value, predictedAdvancedTeamId: value }
+  },
+})
+
+const predictedDraw = computed(() => homeScore.value === awayScore.value)
+const resolvedPredictedAdvancedTeamId = computed(() => {
+  if (!knockout.value) {
+    return null
+  }
+
+  if (predictedDraw.value) {
+    return predictedAdvancedTeamId.value
+  }
+
+  return homeScore.value > awayScore.value ? props.match.homeTeamId : props.match.awayTeamId
+})
+
 const validationMessage = computed(() =>
   validatePredictionInput({
     predictedHomeScore: draft.value.predictedHomeScore,
     predictedAwayScore: draft.value.predictedAwayScore,
     firstScorerPlayerId: draft.value.firstScorerPlayerId,
     noScorer: draft.value.noScorer,
+    predictedAdvancedTeamId: resolvedPredictedAdvancedTeamId.value,
+  }, {
+    isKnockout: knockout.value,
+    homeTeamId: props.match.homeTeamId,
+    awayTeamId: props.match.awayTeamId,
   }),
 )
 
@@ -107,6 +136,16 @@ watch(
       />
     </div>
 
+    <p v-if="knockout" class="knockout-notice">
+      Wynik i strzelcy liczą się do 90. minuty. Przy remisie wskaż drużynę, która awansuje dalej.
+    </p>
+
+    <AdvancementPicker
+      v-if="knockout && predictedDraw"
+      v-model="predictedAdvancedTeamId"
+      :teams="matchTeams"
+    />
+
     <div class="scorer-section">
       <PlayerSelect v-model="firstScorerPlayerId" :players="props.players" :teams="props.teams" :disabled="noScorer" />
       <NoScorerToggle v-model="noScorer" />
@@ -134,8 +173,20 @@ watch(
 
 .editor-header h3,
 .editor-header p,
+.knockout-notice,
 .validation-message {
   margin: 0;
+}
+
+.knockout-notice {
+  border-left: 3px solid #d7b46a;
+  border-radius: 0 7px 7px 0;
+  background: #fff8e8;
+  padding: 10px 12px;
+  color: #665224;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .form-kicker {

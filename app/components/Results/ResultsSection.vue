@@ -13,7 +13,7 @@ import type {
 } from '~/types/domain'
 import type { PlayerNameParts } from '~/utils/footballUi'
 import { displayTeamName, formatPlayerNameParts, getTeamFlag, predictionScoreLabel } from '~/utils/footballUi'
-import { defaultScoringRules } from '~/utils/scoring'
+import { advancementBonusPoints, defaultScoringRules, isKnockoutStage } from '~/utils/scoring'
 
 type PredictionResultState = 'exact' | 'outcome' | 'miss' | 'empty'
 type ScorerState = 'hit' | 'miss' | 'empty'
@@ -33,6 +33,7 @@ interface ResultPlayerRow {
   scorerState: ScorerState
   scorerName: PlayerNameParts | null
   scorerFirstBonus: boolean
+  advancementPoints: number
 }
 
 interface ResultMatchRow {
@@ -285,6 +286,7 @@ function buildPlayerRow(member: LeagueMember, match: Match, goalEvents: readonly
     scorerState: prediction ? predictionScorerState(match, prediction, goalEvents) : 'empty',
     scorerName: scorerNameParts(prediction),
     scorerFirstBonus: prediction ? hasFirstScorerBonus(match, prediction, goalEvents) : false,
+    advancementPoints: prediction ? advancementBonusPoints(match, prediction) : 0,
   }
 }
 
@@ -472,7 +474,7 @@ function totalScorerPoints(row: ResultPlayerRow) {
 }
 
 function totalPoints(row: ResultPlayerRow) {
-  return outcomePoints(row) + exactScorePoints(row) + totalScorerPoints(row)
+  return outcomePoints(row) + exactScorePoints(row) + totalScorerPoints(row) + row.advancementPoints
 }
 
 function scoreLabel(row: ResultPlayerRow) {
@@ -851,6 +853,7 @@ function normalizeSearch(value: string) {
                       <th>Wynik</th>
                       <th>Dokł.</th>
                       <th>Strz.</th>
+                      <th v-if="isKnockoutStage(group.stage)">Awans</th>
                       <th>Suma</th>
                     </tr>
                   </thead>
@@ -880,6 +883,7 @@ function normalizeSearch(value: string) {
                       <td>{{ outcomePoints(playerRow) }}</td>
                       <td>{{ exactScorePoints(playerRow) }}</td>
                       <td>{{ totalScorerPoints(playerRow) }}</td>
+                      <td v-if="isKnockoutStage(group.stage)">{{ playerRow.advancementPoints }}</td>
                       <td>
                         <strong class="total-points">{{ totalPoints(playerRow) }}</strong>
                       </td>
@@ -921,6 +925,7 @@ function normalizeSearch(value: string) {
                     <span>W/D/L {{ outcomePoints(playerRow) }}</span>
                     <span>Dokł. {{ exactScorePoints(playerRow) }}</span>
                     <span>Strz. {{ totalScorerPoints(playerRow) }}</span>
+                    <span v-if="isKnockoutStage(group.stage)">Awans {{ playerRow.advancementPoints }}</span>
                   </div>
                 </article>
               </div>

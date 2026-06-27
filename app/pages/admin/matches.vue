@@ -6,8 +6,8 @@ import { displayTeamName } from '~/utils/footballUi'
 interface MatchEditorRow {
   match: Match
   matchEvents: readonly MatchEvent[]
-  homeTeam: Team
-  awayTeam: Team
+  homeTeam?: Team
+  awayTeam?: Team
   players: readonly Player[]
 }
 
@@ -19,15 +19,17 @@ interface MatchEditorGroup {
 const { matchEvents, matches, players, stages, teams } = useTyperekData()
 const { getMatchTeams, getPlayersForMatch } = useTeamLookup(teams, players)
 const searchQuery = shallowRef('')
-const hideSavedMatches = shallowRef(false)
+const hideSavedMatches = shallowRef(true)
 
 const matchEditorRows = computed<MatchEditorRow[]>(() => {
   const rows: MatchEditorRow[] = []
 
   for (const match of matches) {
     const { homeTeam, awayTeam } = getMatchTeams(match)
+    const stage = stages.find((candidate) => candidate.id === match.stageId)
+    const canAssignTeamsManually = stage?.code === 'round_of_32'
 
-    if (!homeTeam || !awayTeam) {
+    if ((!homeTeam || !awayTeam) && !canAssignTeamsManually) {
       continue
     }
 
@@ -143,15 +145,22 @@ function matchCountLabel(count: number) {
         </div>
 
         <div class="match-editor-list">
-          <AdminMatchEditor
-            v-for="row in group.rows"
-            :key="row.match.id"
-            :match="row.match"
-            :match-events="row.matchEvents"
-            :home-team="row.homeTeam"
-            :away-team="row.awayTeam"
-            :players="row.players"
-          />
+          <div v-for="row in group.rows" :key="row.match.id" class="match-management-stack">
+            <AdminMatchTeamsEditor
+              v-if="group.stage.code === 'round_of_32'"
+              :match="row.match"
+              :teams="teams"
+            />
+            <AdminMatchEditor
+              v-if="row.homeTeam && row.awayTeam"
+              :match="row.match"
+              :stage="group.stage"
+              :match-events="row.matchEvents"
+              :home-team="row.homeTeam"
+              :away-team="row.awayTeam"
+              :players="row.players"
+            />
+          </div>
         </div>
       </section>
     </div>
@@ -268,6 +277,11 @@ function matchCountLabel(count: number) {
 
 .match-editor-group {
   gap: 12px;
+}
+
+.match-management-stack {
+  display: grid;
+  gap: 8px;
 }
 
 .match-group-heading {

@@ -92,6 +92,28 @@ const resultLabel = computed(() => {
 
 const homeName = computed(() => displayTeamName(props.homeTeam, props.match.homePlaceholder ?? 'Do ustalenia'))
 const awayName = computed(() => displayTeamName(props.awayTeam, props.match.awayPlaceholder ?? 'Do ustalenia'))
+const advancedTeamName = computed(() => {
+  if (props.match.advancedTeamId === props.match.homeTeamId) {
+    return homeName.value
+  }
+
+  if (props.match.advancedTeamId === props.match.awayTeamId) {
+    return awayName.value
+  }
+
+  return null
+})
+const predictedAdvancedTeamName = computed(() => {
+  if (props.prediction?.predictedAdvancedTeamId === props.match.homeTeamId) {
+    return homeName.value
+  }
+
+  if (props.prediction?.predictedAdvancedTeamId === props.match.awayTeamId) {
+    return awayName.value
+  }
+
+  return null
+})
 const homeFlag = computed(() => getTeamFlag(props.homeTeam))
 const awayFlag = computed(() => getTeamFlag(props.awayTeam))
 const groupLabel = computed(() => (props.match.groupCode ? `Grupa ${props.match.groupCode}` : props.stage.shortName))
@@ -387,6 +409,10 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <p v-if="advancedTeamName" class="advancement-summary actual-advancement">
+      Awans: <strong>{{ advancedTeamName }}</strong>
+    </p>
+
     <PredictionParticipants
       v-if="participantMembers.length"
       :members="participantMembers"
@@ -425,6 +451,10 @@ onBeforeUnmount(() => {
       <span class="prediction-label">{{ props.predictionLabel ?? 'Typ' }}</span>
       <strong class="prediction-score">{{ props.predictionPlaceholder }}</strong>
     </div>
+
+    <p v-if="props.prediction && predictedAdvancedTeamName" class="advancement-summary predicted-advancement">
+      Typowany awans: <strong>{{ predictedAdvancedTeamName }}</strong>
+    </p>
 
     <div v-if="props.to" class="match-card-action">
       <span>{{ actionLabel }}</span>
@@ -721,6 +751,25 @@ onBeforeUnmount(() => {
   background: #fbfdf9;
   padding: 10px 12px;
   max-width: 100%;
+}
+
+.advancement-summary {
+  margin: 0;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.actual-advancement {
+  background: #13231b;
+  color: white;
+}
+
+.predicted-advancement {
+  border: 1px solid #d7e7da;
+  background: #f7fbf6;
+  color: var(--app-primary-dark);
 }
 
 .prediction-strip.is-exact {

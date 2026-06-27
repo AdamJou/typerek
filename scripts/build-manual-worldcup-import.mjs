@@ -14,6 +14,16 @@ const STAGE_BY_KNOCKOUT_ROUND = {
   Final: 'final',
 }
 
+// Confirmed by the live tournament bracket before the upstream fixture file was updated.
+const CONFIRMED_KNOCKOUT_TEAMS = {
+  74: { home: 'GER', away: 'PAR' },
+  77: { home: 'FRA', away: 'SWE' },
+  78: { home: 'CIV', away: 'NOR' },
+  81: { home: 'USA', away: 'BIH' },
+  86: { home: 'ARG', away: 'CPV' },
+  88: { home: 'AUS', away: 'EGY' },
+}
+
 async function loadJson(url) {
   const response = await fetch(url)
   if (!response.ok) {
@@ -160,8 +170,9 @@ function buildMatches(rawMatches, rawTeams) {
   const groupCounters = new Map()
 
   return rawMatches.map((match, index) => {
-    const homeTeamCode = nameToCode.get(match.team1) ?? null
-    const awayTeamCode = nameToCode.get(match.team2) ?? null
+    const confirmedTeams = CONFIRMED_KNOCKOUT_TEAMS[match.num]
+    const homeTeamCode = confirmedTeams?.home ?? nameToCode.get(match.team1) ?? null
+    const awayTeamCode = confirmedTeams?.away ?? nameToCode.get(match.team2) ?? null
     const isGroupMatch = match.group?.startsWith('Group ')
     const groupCode = isGroupMatch ? match.group.replace('Group ', '') : null
     const stageCode = isGroupMatch

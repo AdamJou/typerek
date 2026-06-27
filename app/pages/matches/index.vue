@@ -4,7 +4,7 @@ import type { Match, TournamentStage } from '~/types/domain'
 import type { BulkPredictionDraft } from '~/components/Predictions/BulkPredictionEditor.vue'
 import type { MatchesListMode } from '~/composables/useMatchesListState'
 import { compareMatchesChronologically, isMatchToday, isUpcomingMatch } from '~/utils/footballUi'
-import { currentPredictionStageId, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen } from '~/utils/scoring'
+import { currentPredictionStageId, isKnockoutStage, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen } from '~/utils/scoring'
 
 type MatchViewMode = MatchesListMode
 
@@ -186,7 +186,20 @@ function defaultBulkDraft(): BulkPredictionDraft {
     predictedAwayScore: 0,
     firstScorerPlayerId: null,
     noScorer: false,
+    predictedAdvancedTeamId: null,
   }
+}
+
+function predictedAdvancedTeamIdFor(match: Match, draft: BulkPredictionDraft) {
+  if (!isKnockoutStage(stageFor(match.stageId))) {
+    return null
+  }
+
+  if (draft.predictedHomeScore === draft.predictedAwayScore) {
+    return draft.predictedAdvancedTeamId
+  }
+
+  return draft.predictedHomeScore > draft.predictedAwayScore ? match.homeTeamId : match.awayTeamId
 }
 
 function predictionTeamsFor(match: Match) {
@@ -217,6 +230,7 @@ async function saveBulkPredictions() {
           predictedAwayScore: bulkDrafts[match.id]!.predictedAwayScore,
           firstScorerPlayerId: bulkDrafts[match.id]!.noScorer ? null : bulkDrafts[match.id]!.firstScorerPlayerId,
           noScorer: bulkDrafts[match.id]!.noScorer,
+          predictedAdvancedTeamId: predictedAdvancedTeamIdFor(match, bulkDrafts[match.id]!),
         }),
       ),
     )
@@ -424,6 +438,7 @@ watch(
           <BulkPredictionEditor
             :draft="bulkDrafts[match.id] ?? defaultBulkDraft()"
             :match="match"
+            :stage="stageFor(match.stageId)!"
             :players="getPlayersForMatch(match)"
             :teams="predictionTeamsFor(match)"
             @update:draft="bulkDrafts[match.id] = $event"

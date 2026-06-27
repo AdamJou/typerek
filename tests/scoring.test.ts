@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Match, MatchEvent, MatchPrediction, ScoreBreakdown } from '~/types/domain'
 import {
+  advancementBonusPoints,
   aggregateRanking,
   canRevealMatchPredictions,
   defaultScoringRules,
@@ -23,6 +24,7 @@ const baseMatch: Match = {
   awayScore90: 1,
   firstScorerPlayerId: 'player-home-1',
   noScorerConfirmed: false,
+  advancedTeamId: null,
   resultConfirmedAt: '2026-06-11T21:00:00Z',
 }
 
@@ -36,6 +38,7 @@ function prediction(overrides: Partial<MatchPrediction> = {}): MatchPrediction {
     predictedAwayScore: 1,
     firstScorerPlayerId: 'player-home-1',
     noScorer: false,
+    predictedAdvancedTeamId: null,
     updatedAt: '2026-06-10T12:00:00Z',
     ...overrides,
   }
@@ -84,6 +87,60 @@ describe('scoreMatchPrediction', () => {
   })
 })
 
+describe('knockout advancement bonus', () => {
+  it.each([
+    {
+      name: 'awards +1 when a predicted 90-minute winner advances after an actual draw',
+      match: { homeScore90: 1, awayScore90: 1, advancedTeamId: 'team-home' },
+      prediction: { predictedHomeScore: 2, predictedAwayScore: 1, predictedAdvancedTeamId: 'team-home' },
+      expected: 1,
+    },
+    {
+      name: 'awards 0 when the other team advances after an actual draw',
+      match: { homeScore90: 1, awayScore90: 1, advancedTeamId: 'team-away' },
+      prediction: { predictedHomeScore: 2, predictedAwayScore: 1, predictedAdvancedTeamId: 'team-home' },
+      expected: 0,
+    },
+    {
+      name: 'awards +2 for a correct advancement pick with a predicted draw',
+      match: { homeScore90: 1, awayScore90: 1, advancedTeamId: 'team-home' },
+      prediction: { predictedHomeScore: 1, predictedAwayScore: 1, predictedAdvancedTeamId: 'team-home' },
+      expected: 2,
+    },
+    {
+      name: 'awards +1 when a predicted draw includes the team that wins in 90 minutes',
+      match: { homeScore90: 0, awayScore90: 1, advancedTeamId: 'team-away' },
+      prediction: { predictedHomeScore: 1, predictedAwayScore: 1, predictedAdvancedTeamId: 'team-away' },
+      expected: 1,
+    },
+    {
+      name: 'awards 0 for a wrong advancement pick with a predicted draw',
+      match: { homeScore90: 1, awayScore90: 1, advancedTeamId: 'team-away' },
+      prediction: { predictedHomeScore: 1, predictedAwayScore: 1, predictedAdvancedTeamId: 'team-home' },
+      expected: 0,
+    },
+    {
+      name: 'awards +1 when the predicted winner also won in 90 minutes and advanced',
+      match: { homeScore90: 1, awayScore90: 0, advancedTeamId: 'team-home' },
+      prediction: { predictedHomeScore: 1, predictedAwayScore: 0, predictedAdvancedTeamId: 'team-home' },
+      expected: 1,
+    },
+    {
+      name: 'awards +1 for an away advancement predicted from a non-draw score after 0:0',
+      match: { homeScore90: 0, awayScore90: 0, advancedTeamId: 'team-away' },
+      prediction: { predictedHomeScore: 0, predictedAwayScore: 1, predictedAdvancedTeamId: 'team-away' },
+      expected: 1,
+    },
+  ])('$name', ({ match, prediction: predicted, expected }) => {
+    expect(
+      advancementBonusPoints(
+        { ...baseMatch, ...match },
+        prediction(predicted),
+      ),
+    ).toBe(expected)
+  })
+})
+
 describe('aggregateRanking', () => {
   it('combines the scorer point and first-goal bonus in the scorer column', () => {
     const breakdowns: ScoreBreakdown[] = [
@@ -96,6 +153,7 @@ describe('aggregateRanking', () => {
         outcomePoints: 2,
         exactScorePoints: 0,
         firstScorerPoints: 1,
+        advancementPoints: 0,
         bonusPoints: 2,
         totalPoints: 5,
       },
@@ -108,6 +166,7 @@ describe('aggregateRanking', () => {
         outcomePoints: 0,
         exactScorePoints: 0,
         firstScorerPoints: 0,
+        advancementPoints: 0,
         bonusPoints: 4,
         totalPoints: 4,
       },
@@ -131,6 +190,7 @@ describe('aggregateRanking', () => {
         outcomePoints: 2,
         exactScorePoints: 0,
         firstScorerPoints: 3,
+        advancementPoints: 0,
         bonusPoints: 0,
         totalPoints: 5,
       },
@@ -140,6 +200,21 @@ describe('aggregateRanking', () => {
 
     expect(row?.firstScorerPoints).toBe(3)
     expect(row?.totalPoints).toBe(5)
+  })
+
+  it('keeps advancement points in a separate ranking column', () => {
+    const breakdowns = [scoreBreakdown('jurson', 'r32', 6, {
+      outcomePoints: 2,
+      firstScorerPoints: 1,
+      advancementPoints: 1,
+      bonusPoints: 2,
+    })]
+
+    const [row] = aggregateRanking(breakdowns, [{ userId: 'jurson', displayName: 'Jurson' }])
+
+    expect(row?.firstScorerPoints).toBe(3)
+    expect(row?.advancementPoints).toBe(1)
+    expect(row?.totalPoints).toBe(6)
   })
 
   it('assigns the same general position to players tied on points', () => {
@@ -365,6 +440,7 @@ describe('prediction guards', () => {
         predictedAwayScore: 0,
         firstScorerPlayerId: null,
         noScorer: true,
+        predictedAdvancedTeamId: null,
       }),
     ).toBe('Opcja braku strzelca jest dozwolona tylko przy typie 0:0.')
   })
@@ -374,7 +450,7 @@ function scoreBreakdown(
   userId: string,
   stageId: string,
   totalPoints: number,
-  overrides: Partial<Pick<ScoreBreakdown, 'outcomePoints' | 'exactScorePoints' | 'firstScorerPoints' | 'bonusPoints'>> = {},
+  overrides: Partial<Pick<ScoreBreakdown, 'outcomePoints' | 'exactScorePoints' | 'firstScorerPoints' | 'advancementPoints' | 'bonusPoints'>> = {},
 ): ScoreBreakdown {
   return {
     leagueId: 'league-1',
@@ -385,6 +461,7 @@ function scoreBreakdown(
     outcomePoints: overrides.outcomePoints ?? totalPoints,
     exactScorePoints: overrides.exactScorePoints ?? 0,
     firstScorerPoints: overrides.firstScorerPoints ?? 0,
+    advancementPoints: overrides.advancementPoints ?? 0,
     bonusPoints: overrides.bonusPoints ?? 0,
     totalPoints,
   }
