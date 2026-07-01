@@ -8,6 +8,7 @@ type PredictionSummaryRow = {
   member: LeagueMember
   prediction: MatchPrediction
   scorerName: string
+  predictedAdvancedTeamName: string | null
   stagePosition: number | null
 }
 
@@ -99,10 +100,15 @@ function sortButtonClass(key: SortKey) {
         </button>
       </div>
 
-      <div v-for="{ member, prediction, scorerName, stagePosition } in sortedRows" :key="prediction.id" class="prediction-summary-row">
+      <div v-for="{ member, prediction, scorerName, predictedAdvancedTeamName, stagePosition } in sortedRows" :key="prediction.id" class="prediction-summary-row">
         <span class="prediction-summary-position">{{ stagePosition ? `#${stagePosition}` : '-' }}</span>
         <strong class="prediction-summary-player">{{ member.displayName }}</strong>
-        <strong class="prediction-summary-score">{{ predictionScoreLabel(prediction) }}</strong>
+        <div class="prediction-summary-score-cell">
+          <strong class="prediction-summary-score">{{ predictionScoreLabel(prediction) }}</strong>
+          <span v-if="predictedAdvancedTeamName" class="prediction-summary-advancement">
+            Awans {{ predictedAdvancedTeamName }}
+          </span>
+        </div>
         <span class="prediction-summary-scorer">{{ scorerName }}</span>
       </div>
     </div>
@@ -144,7 +150,7 @@ function sortButtonClass(key: SortKey) {
 
 .prediction-summary-row {
   display: grid;
-  grid-template-columns: 76px minmax(120px, 220px) 64px minmax(140px, 1fr);
+  grid-template-columns: 76px minmax(120px, 220px) minmax(82px, 138px) minmax(140px, 1fr);
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -203,12 +209,18 @@ function sortButtonClass(key: SortKey) {
 
 .prediction-summary-player,
 .prediction-summary-position,
-.prediction-summary-score,
 .prediction-summary-scorer {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.prediction-summary-score-cell {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-width: 0;
 }
 
 .prediction-summary-player {
@@ -237,6 +249,21 @@ function sortButtonClass(key: SortKey) {
   font-weight: 950;
 }
 
+.prediction-summary-advancement {
+  display: inline-flex;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #edf8ef;
+  padding: 3px 6px;
+  color: var(--app-primary-dark);
+  font-size: 10px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
 .prediction-summary-scorer {
   color: var(--app-ink);
   font-size: 12px;
@@ -249,7 +276,7 @@ function sortButtonClass(key: SortKey) {
   }
 
   .prediction-summary-row {
-    grid-template-columns: 54px minmax(76px, 1fr) 52px minmax(82px, 1fr);
+    grid-template-columns: 46px minmax(72px, 1fr) minmax(64px, 92px) minmax(76px, 1fr);
     gap: 7px;
     padding-inline: 8px;
   }

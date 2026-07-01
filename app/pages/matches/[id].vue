@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { MatchPrediction } from '~/types/domain'
-import { formatPlayerDisplayName } from '~/utils/footballUi'
+import { displayTeamName, formatPlayerDisplayName } from '~/utils/footballUi'
 import { aggregateRanking, canRevealMatchPredictions, isMatchPredictionOpen, isPredictionLocked, isStagePredictionOpen, shouldUseGeneralRankingTieBreakers } from '~/utils/scoring'
 
 const route = useRoute()
@@ -102,6 +102,7 @@ const predictionSummaryRows = computed(() => {
         member,
         prediction,
         scorerName: scorerNameForPrediction(prediction),
+        predictedAdvancedTeamName: predictedAdvancedTeamNameFor(prediction),
         stagePosition: stagePositionByUserId.value.get(member.userId) ?? null,
       },
     ]
@@ -162,6 +163,22 @@ function scorerNameForPrediction(prediction: MatchPrediction) {
   const player = getPlayer(prediction.firstScorerPlayerId)
 
   return player ? formatPlayerDisplayName(player.name) : 'Strzelec wybrany'
+}
+
+function predictedAdvancedTeamNameFor(prediction: MatchPrediction) {
+  if (!match.value || prediction.predictedHomeScore !== prediction.predictedAwayScore) {
+    return null
+  }
+
+  if (prediction.predictedAdvancedTeamId === match.value.homeTeamId) {
+    return displayTeamName(matchTeams.value?.homeTeam, match.value.homePlaceholder ?? 'Do ustalenia')
+  }
+
+  if (prediction.predictedAdvancedTeamId === match.value.awayTeamId) {
+    return displayTeamName(matchTeams.value?.awayTeam, match.value.awayPlaceholder ?? 'Do ustalenia')
+  }
+
+  return null
 }
 
 function schedulePredictionUnlock() {

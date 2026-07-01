@@ -104,16 +104,9 @@ const advancedTeamName = computed(() => {
   return null
 })
 const predictedAdvancedTeamName = computed(() => {
-  if (props.prediction?.predictedAdvancedTeamId === props.match.homeTeamId) {
-    return homeName.value
-  }
-
-  if (props.prediction?.predictedAdvancedTeamId === props.match.awayTeamId) {
-    return awayName.value
-  }
-
-  return null
+  return predictedAdvancedTeamNameFor(props.prediction, false)
 })
+const selectedPredictedAdvancedTeamName = computed(() => predictedAdvancedTeamNameFor(selectedPrediction.value, true))
 const homeFlag = computed(() => getTeamFlag(props.homeTeam))
 const awayFlag = computed(() => getTeamFlag(props.awayTeam))
 const groupLabel = computed(() => (props.match.groupCode ? `Grupa ${props.match.groupCode}` : props.stage.shortName))
@@ -221,6 +214,22 @@ function resultSign(homeScore: number, awayScore: number) {
   }
 
   return 'draw'
+}
+
+function predictedAdvancedTeamNameFor(prediction: MatchPrediction | null | undefined, drawOnly: boolean) {
+  if (!prediction || (drawOnly && prediction.predictedHomeScore !== prediction.predictedAwayScore)) {
+    return null
+  }
+
+  if (prediction.predictedAdvancedTeamId === props.match.homeTeamId) {
+    return homeName.value
+  }
+
+  if (prediction.predictedAdvancedTeamId === props.match.awayTeamId) {
+    return awayName.value
+  }
+
+  return null
 }
 
 function goalScorerNameParts(event: MatchEvent) {
@@ -466,6 +475,7 @@ onBeforeUnmount(() => {
       :member="selectedMember"
       :prediction="selectedPrediction"
       :scorer-name="selectedScorerName"
+      :predicted-advanced-team-name="selectedPredictedAdvancedTeamName"
       :loading="selectedPredictionLoading"
       :error-message="selectedPredictionError"
       :can-go-previous="canShowPreviousPrediction"

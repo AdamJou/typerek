@@ -7,6 +7,7 @@ const props = defineProps<{
   member: LeagueMember
   prediction: MatchPrediction | null
   scorerName: string
+  predictedAdvancedTeamName?: string | null
   loading: boolean
   errorMessage: string
   canGoPrevious: boolean
@@ -89,7 +90,11 @@ onBeforeUnmount(() => {
         <p v-if="props.loading" class="modal-state">Pobieram typ...</p>
         <p v-else-if="props.errorMessage" class="modal-state is-error">{{ props.errorMessage }}</p>
 
-        <div v-else-if="props.prediction" class="prediction-details">
+        <div
+          v-else-if="props.prediction"
+          class="prediction-details"
+          :class="{ 'has-advancement': props.predictedAdvancedTeamName }"
+        >
           <div>
             <span>Wynik</span>
             <strong>{{ predictionScoreLabel(props.prediction) }}</strong>
@@ -97,6 +102,10 @@ onBeforeUnmount(() => {
           <div>
             <span>Pierwszy strzelec</span>
             <strong>{{ props.scorerName }}</strong>
+          </div>
+          <div v-if="props.predictedAdvancedTeamName" class="prediction-advancement">
+            <span>Awans po remisie</span>
+            <strong>{{ props.predictedAdvancedTeamName }}</strong>
           </div>
         </div>
 
@@ -222,6 +231,12 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: var(--app-bg);
   padding: 14px;
+}
+
+.prediction-details.has-advancement .prediction-advancement {
+  grid-column: 1 / -1;
+  border-color: rgba(12, 107, 70, 0.26);
+  background: #edf8ef;
 }
 
 .prediction-details strong {
