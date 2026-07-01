@@ -9,6 +9,7 @@ type PredictionSummaryRow = {
   prediction: MatchPrediction
   scorerName: string
   predictedAdvancedTeamName: string | null
+  predictedAdvancedTeamSide: 'home' | 'away' | null
   stagePosition: number | null
 }
 
@@ -100,14 +101,28 @@ function sortButtonClass(key: SortKey) {
         </button>
       </div>
 
-      <div v-for="{ member, prediction, scorerName, predictedAdvancedTeamName, stagePosition } in sortedRows" :key="prediction.id" class="prediction-summary-row">
+      <div v-for="{ member, prediction, scorerName, predictedAdvancedTeamName, predictedAdvancedTeamSide, stagePosition } in sortedRows" :key="prediction.id" class="prediction-summary-row">
         <span class="prediction-summary-position">{{ stagePosition ? `#${stagePosition}` : '-' }}</span>
         <strong class="prediction-summary-player">{{ member.displayName }}</strong>
         <div class="prediction-summary-score-cell">
-          <strong class="prediction-summary-score">{{ predictionScoreLabel(prediction) }}</strong>
-          <span v-if="predictedAdvancedTeamName" class="prediction-summary-advancement">
-            Awans {{ predictedAdvancedTeamName }}
-          </span>
+          <strong
+            class="prediction-summary-score"
+            :aria-label="predictedAdvancedTeamName
+              ? `${predictionScoreLabel(prediction)}, awansuje ${predictedAdvancedTeamName}`
+              : predictionScoreLabel(prediction)"
+          >
+            <span
+              class="prediction-summary-score-number"
+              :class="{ 'is-advancing': predictedAdvancedTeamSide === 'home' }"
+              aria-hidden="true"
+            >{{ prediction.predictedHomeScore }}</span>
+            <span class="prediction-summary-score-separator" aria-hidden="true">:</span>
+            <span
+              class="prediction-summary-score-number"
+              :class="{ 'is-advancing': predictedAdvancedTeamSide === 'away' }"
+              aria-hidden="true"
+            >{{ prediction.predictedAwayScore }}</span>
+          </strong>
         </div>
         <span class="prediction-summary-scorer">{{ scorerName }}</span>
       </div>
@@ -217,9 +232,8 @@ function sortButtonClass(key: SortKey) {
 }
 
 .prediction-summary-score-cell {
-  display: grid;
-  justify-items: start;
-  gap: 4px;
+  display: flex;
+  align-items: center;
   min-width: 0;
 }
 
@@ -249,19 +263,18 @@ function sortButtonClass(key: SortKey) {
   font-weight: 950;
 }
 
-.prediction-summary-advancement {
+.prediction-summary-score-number {
   display: inline-flex;
-  max-width: 100%;
-  overflow: hidden;
-  border-radius: 7px;
-  background: #edf8ef;
-  padding: 3px 6px;
-  color: var(--app-primary-dark);
-  font-size: 10px;
-  font-weight: 950;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
+  min-width: 0.65em;
+  justify-content: center;
+}
+
+.prediction-summary-score-number.is-advancing {
+  color: #f1ca72;
+  text-decoration: underline;
+  text-decoration-color: #d7b46a;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
 }
 
 .prediction-summary-scorer {

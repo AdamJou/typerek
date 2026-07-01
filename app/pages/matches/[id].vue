@@ -103,6 +103,7 @@ const predictionSummaryRows = computed(() => {
         prediction,
         scorerName: scorerNameForPrediction(prediction),
         predictedAdvancedTeamName: predictedAdvancedTeamNameFor(prediction),
+        predictedAdvancedTeamSide: predictedAdvancedTeamSideFor(prediction),
         stagePosition: stagePositionByUserId.value.get(member.userId) ?? null,
       },
     ]
@@ -176,6 +177,22 @@ function predictedAdvancedTeamNameFor(prediction: MatchPrediction) {
 
   if (prediction.predictedAdvancedTeamId === match.value.awayTeamId) {
     return displayTeamName(matchTeams.value?.awayTeam, match.value.awayPlaceholder ?? 'Do ustalenia')
+  }
+
+  return null
+}
+
+function predictedAdvancedTeamSideFor(prediction: MatchPrediction): 'home' | 'away' | null {
+  if (!match.value || prediction.predictedHomeScore !== prediction.predictedAwayScore) {
+    return null
+  }
+
+  if (prediction.predictedAdvancedTeamId === match.value.homeTeamId) {
+    return 'home'
+  }
+
+  if (prediction.predictedAdvancedTeamId === match.value.awayTeamId) {
+    return 'away'
   }
 
   return null
